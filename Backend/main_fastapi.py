@@ -62,7 +62,9 @@ except Exception as e:
     db = None
 
 # Get Firebase Web API Key from environment variables
-FIREBASE_WEB_API_KEY = os.getenv("FIREBASE_WEB_API_KEY", "AIzaSyBGcFE1SRkVAtA44_PjYsg3R5dYFX2oN7o")
+FIREBASE_WEB_API_KEY = os.getenv("FIREBASE_WEB_API_KEY")
+if not FIREBASE_WEB_API_KEY:
+    raise ValueError("FIREBASE_WEB_API_KEY environment variable is required")
 print(f"✅ Firebase Web API Key loaded: {FIREBASE_WEB_API_KEY[:20]}...")
 
 # Security
