@@ -1,0 +1,22 @@
+# Compatible versions for FastAPI and Pydantic
+fastapi==0.95.2
+uvicorn[standard]==0.22.0
+pydantic==1.10.13
+
+# Firebase Admin SDK
+firebase-admin==6.4.0
+
+# HTTP client
+httpx==0.25.2
+
+# CORS middleware
+python-multipart==0.0.6
+
+# Environment variables
+python-dotenv==1.0.0
+
+# Email validation
+email-validator==2.1.0
+
+# Date and time utilities
+python-dateutil==2.8.2

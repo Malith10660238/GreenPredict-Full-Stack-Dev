@@ -1,0 +1,16 @@
+# Gmail Configuration for Email Sending
+# Copy this to .env file and replace with your actual credentials
+
+# Your Gmail address
+malithamarasinghe6@gmail.com
+
+# Gmail App Password (NOT your regular password)
+# To get this:
+# 1. Go to Google Account settings
+# 2. Security → 2-Step Verification (enable if not already)
+# 3. App passwords → Generate app password
+# 4. Use the generated 16-character password here
+GMAIL_APP_PASSWORD=your-16-character-app-password
+
+# Firebase Configuration (if needed)
+FIREBASE_PROJECT_ID=your-firebase-project-id
