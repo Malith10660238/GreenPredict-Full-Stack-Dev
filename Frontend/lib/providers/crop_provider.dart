@@ -23,7 +23,7 @@ class CropProvider with ChangeNotifier {
     notifyListeners();
   }
   
-  Future<void> getPrediction(Map<String, dynamic> inputData) async {
+  Future<void> getPrediction(Map<String, dynamic> inputData, String token) async {
     try {
       _setLoading(true);
       _setError(null);
@@ -31,7 +31,7 @@ class CropProvider with ChangeNotifier {
       print('🔵 CropProvider: Getting prediction with data: $inputData');
       
       // Call the real backend API for AI predictions
-      final predictionData = await _apiService.getPrediction(inputData);
+      final predictionData = await _apiService.getPrediction(inputData, token);
       
       print('🔵 CropProvider: Received response: $predictionData');
       

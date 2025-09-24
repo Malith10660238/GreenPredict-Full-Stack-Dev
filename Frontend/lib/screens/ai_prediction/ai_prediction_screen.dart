@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/crop_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/gradient_button.dart';
 import 'ai_analysis_report_screen.dart';
@@ -121,7 +122,21 @@ class _AIPredictionScreenState extends State<AIPredictionScreen> {
         'crop': _selectedCrop,
       };
       
-      await cropProvider.getPrediction(inputData);
+      // Get authentication token
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.authToken;
+      
+      if (token == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please login to make predictions'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      
+      await cropProvider.getPrediction(inputData, token);
       
       if (mounted) {
         Navigator.push(

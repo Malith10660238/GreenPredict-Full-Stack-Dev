@@ -4,11 +4,10 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   // FastAPI backend URL
-  static const String baseUrl = 'http://192.168.1.157:8001'; // FastAPI backend
+  static const String baseUrl = 'http://10.224.79.220:8001'; // FastAPI backend
   
   // API Endpoints
   static const String _authEndpoint = '/auth';
-  static const String _predictionEndpoint = '/prediction';
   static const String _listingsEndpoint = '/listings';
   static const String _profileEndpoint = '/profile/';
   
@@ -353,7 +352,7 @@ Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
   }
 
   // AI Prediction API
-  Future<Map<String, dynamic>> getPrediction(Map<String, dynamic> inputData) async {
+  Future<Map<String, dynamic>> getPrediction(Map<String, dynamic> inputData, String token) async {
     try {
       // Convert frontend data format to backend format
       final backendData = {
@@ -366,12 +365,12 @@ Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
         'crop': inputData['crop'] ?? 'Cabbage',
       };
       
-      print('🔵 Sending prediction request to: $baseUrl/predictions/test-analyze');
+      print('🔵 Sending prediction request to: $baseUrl/predictions/analyze');
       print('🔵 Request data: $backendData');
       
       final response = await http.post(
-        Uri.parse('$baseUrl/predictions/test-analyze'),
-        headers: _headers,
+        Uri.parse('$baseUrl/predictions/analyze'),
+        headers: _authHeaders(token),
         body: jsonEncode(backendData),
       );
       
@@ -388,6 +387,90 @@ Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
       }
     } catch (e) {
       print('❌ Network error during prediction: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  // Get prediction history
+  Future<List<Map<String, dynamic>>> getPredictionHistory(String token) async {
+    try {
+      print('🔵 Fetching prediction history from: $baseUrl/predictions/history');
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/predictions/history'),
+        headers: _authHeaders(token),
+      );
+      
+      print('🔵 History response status: ${response.statusCode}');
+      print('🔵 History response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> result = jsonDecode(response.body);
+        print('✅ Prediction history fetched successfully!');
+        print('🔵 API Service: Raw response body: ${response.body}');
+        print('🔵 API Service: Parsed result: $result');
+        print('🔵 API Service: Result length: ${result.length}');
+        return List<Map<String, dynamic>>.from(result);
+      } else {
+        print('❌ History fetch failed - Status: ${response.statusCode}, Body: ${response.body}');
+        throw Exception('Failed to fetch prediction history: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during history fetch: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  // Delete a specific prediction
+  Future<Map<String, dynamic>> deletePrediction(String predictionId, String token) async {
+    try {
+      print('🔵 Deleting prediction: $baseUrl/predictions/$predictionId');
+      
+      final response = await http.delete(
+        Uri.parse('$baseUrl/predictions/$predictionId'),
+        headers: _authHeaders(token),
+      );
+      
+      print('🔵 Delete response status: ${response.statusCode}');
+      print('🔵 Delete response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        print('✅ Prediction deleted successfully!');
+        return result;
+      } else {
+        print('❌ Delete failed - Status: ${response.statusCode}, Body: ${response.body}');
+        throw Exception('Failed to delete prediction: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during delete: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  // Delete all predictions
+  Future<Map<String, dynamic>> deleteAllPredictions(String token) async {
+    try {
+      print('🔵 Deleting all predictions: $baseUrl/predictions/');
+      
+      final response = await http.delete(
+        Uri.parse('$baseUrl/predictions/'),
+        headers: _authHeaders(token),
+      );
+      
+      print('🔵 Delete all response status: ${response.statusCode}');
+      print('🔵 Delete all response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        print('✅ All predictions deleted successfully!');
+        return result;
+      } else {
+        print('❌ Delete all failed - Status: ${response.statusCode}, Body: ${response.body}');
+        throw Exception('Failed to delete all predictions: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during delete all: $e');
       throw Exception('Network error: $e');
     }
   }

@@ -4,7 +4,9 @@ import '../../providers/crop_provider.dart';
 import '../../utils/app_theme.dart';
 
 class AIAnalysisReportScreen extends StatelessWidget {
-  const AIAnalysisReportScreen({super.key});
+  final Map<String, dynamic>? predictionData;
+  
+  const AIAnalysisReportScreen({super.key, this.predictionData});
 
   @override
   Widget build(BuildContext context) {
@@ -15,13 +17,14 @@ class AIAnalysisReportScreen extends StatelessWidget {
         ),
         child: Consumer<CropProvider>(
         builder: (context, cropProvider, child) {
-          final prediction = cropProvider.lastPrediction;
+          // Use provided prediction data or fall back to provider data
+          final prediction = predictionData ?? cropProvider.lastPrediction;
           
           print('🔵 AIAnalysisReportScreen: Prediction data: $prediction');
           print('🔵 AIAnalysisReportScreen: Is loading: ${cropProvider.isLoading}');
           print('🔵 AIAnalysisReportScreen: Error: ${cropProvider.errorMessage}');
           
-          if (cropProvider.isLoading) {
+          if (cropProvider.isLoading && predictionData == null) {
             return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -41,7 +44,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
             );
           }
           
-          if (cropProvider.errorMessage != null) {
+          if (cropProvider.errorMessage != null && predictionData == null) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
@@ -86,7 +89,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
             );
           }
           
-          if (prediction == null) {
+          if (prediction == null && predictionData == null) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
@@ -159,12 +162,6 @@ class AIAnalysisReportScreen extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
-                            Icons.analytics,
-                            color: AppTheme.white,
-                            size: 32,
-                          ),
-                          const SizedBox(height: 8),
                           Text(
                             'AI-Powered Crop Analysis',
                             style: AppTheme.bodyLarge.copyWith(
@@ -189,32 +186,32 @@ class AIAnalysisReportScreen extends StatelessWidget {
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     // Current Season Recommendation (with success rate circle)
-                    _buildCurrentSeasonRecommendation(prediction.currentSeasonRecommendation),
+                    _buildCurrentSeasonRecommendation(_getCurrentSeasonRecommendation(prediction)),
                     
                     const SizedBox(height: 20),
                     
                     // Input Parameters Section
-                    _buildInputParametersSection(prediction.inputParameters),
+                    _buildInputParametersSection(_getInputParameters(prediction)),
                     
                     const SizedBox(height: 20),
                     
                     // Yield & Profitability Analysis
-                    _buildYieldProfitabilitySection(prediction.yieldProfitabilityAnalysis),
+                    _buildYieldProfitabilitySection(_getYieldAnalysis(prediction)),
                     
                     const SizedBox(height: 20),
                     
                     // Best Upcoming Seasons
-                    _buildUpcomingSeasonsSection(prediction.bestUpcomingSeasons, prediction.inputParameters.crop),
+                    _buildUpcomingSeasonsSection(_getUpcomingSeasons(prediction), _getCropName(prediction)),
                     
                     const SizedBox(height: 20),
                     
                     // Risk Assessment
-                    _buildRiskAssessmentSection(prediction.riskAssessment),
+                    _buildRiskAssessmentSection(_getRiskAssessment(prediction)),
                     
                     const SizedBox(height: 20),
                     
                     // Alternative Crops
-                    _buildAlternativeCropsSection(prediction.alternativeCrops),
+                    _buildAlternativeCropsSection(_getAlternativeCrops(prediction)),
                     
                     const SizedBox(height: 40),
                   ]),
@@ -677,7 +674,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
                   child: const Icon(
                     Icons.trending_up_rounded,
                     color: AppTheme.white,
-                    size: 32,
+                    size: 24,
                   ),
                 ),
                 const SizedBox(width: 20),
@@ -1237,6 +1234,137 @@ class AIAnalysisReportScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Helper methods to extract data from both prediction formats
+  dynamic _getCurrentSeasonRecommendation(dynamic prediction) {
+    if (prediction == null) return null;
+    
+    // Check if it's from prediction history (Map format)
+    if (prediction is Map<String, dynamic>) {
+      final aiAnalysis = prediction['ai_analysis'];
+      if (aiAnalysis != null && aiAnalysis['current_season'] != null) {
+        return aiAnalysis['current_season'];
+      }
+    }
+    
+    // Check if it's from provider (object format)
+    try {
+      return prediction.currentSeasonRecommendation;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  dynamic _getInputParameters(dynamic prediction) {
+    if (prediction == null) return null;
+    
+    // Check if it's from prediction history (Map format)
+    if (prediction is Map<String, dynamic>) {
+      final aiAnalysis = prediction['ai_analysis'];
+      if (aiAnalysis != null && aiAnalysis['input_parameters'] != null) {
+        return aiAnalysis['input_parameters'];
+      }
+    }
+    
+    // Check if it's from provider (object format)
+    try {
+      return prediction.inputParameters;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  dynamic _getYieldAnalysis(dynamic prediction) {
+    if (prediction == null) return null;
+    
+    // Check if it's from prediction history (Map format)
+    if (prediction is Map<String, dynamic>) {
+      final aiAnalysis = prediction['ai_analysis'];
+      if (aiAnalysis != null && aiAnalysis['yield_analysis'] != null) {
+        return aiAnalysis['yield_analysis'];
+      }
+    }
+    
+    // Check if it's from provider (object format)
+    try {
+      return prediction.yieldProfitabilityAnalysis;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  List<dynamic> _getUpcomingSeasons(dynamic prediction) {
+    if (prediction == null) return [];
+    
+    // Check if it's from prediction history (Map format)
+    if (prediction is Map<String, dynamic>) {
+      final aiAnalysis = prediction['ai_analysis'];
+      if (aiAnalysis != null && aiAnalysis['upcoming_seasons'] != null) {
+        return List<dynamic>.from(aiAnalysis['upcoming_seasons']);
+      }
+    }
+    
+    // Check if it's from provider (object format)
+    try {
+      return List<dynamic>.from(prediction.bestUpcomingSeasons ?? []);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  String _getCropName(dynamic prediction) {
+    if (prediction == null) return 'Unknown';
+    
+    // Check if it's from prediction history (Map format)
+    if (prediction is Map<String, dynamic>) {
+      return prediction['cropType'] ?? 'Unknown';
+    }
+    
+    // Check if it's from provider (object format)
+    try {
+      return prediction.inputParameters?.crop ?? 'Unknown';
+    } catch (e) {
+      return 'Unknown';
+    }
+  }
+
+  dynamic _getRiskAssessment(dynamic prediction) {
+    if (prediction == null) return null;
+    
+    // Check if it's from prediction history (Map format)
+    if (prediction is Map<String, dynamic>) {
+      final aiAnalysis = prediction['ai_analysis'];
+      if (aiAnalysis != null && aiAnalysis['risk_assessment'] != null) {
+        return aiAnalysis['risk_assessment'];
+      }
+    }
+    
+    // Check if it's from provider (object format)
+    try {
+      return prediction.riskAssessment;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  List<dynamic> _getAlternativeCrops(dynamic prediction) {
+    if (prediction == null) return [];
+    
+    // Check if it's from prediction history (Map format)
+    if (prediction is Map<String, dynamic>) {
+      final aiAnalysis = prediction['ai_analysis'];
+      if (aiAnalysis != null && aiAnalysis['alternative_crops'] != null) {
+        return List<dynamic>.from(aiAnalysis['alternative_crops']);
+      }
+    }
+    
+    // Check if it's from provider (object format)
+    try {
+      return List<dynamic>.from(prediction.alternativeCrops ?? []);
+    } catch (e) {
+      return [];
+    }
   }
 }
 
