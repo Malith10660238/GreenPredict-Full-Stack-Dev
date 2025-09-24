@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -56,6 +55,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
+        // Debug logging for consumer profile updates
+        print('🔵 Profile screen rebuild - User type: ${authProvider.user?.userType}');
+        print('🔵 Profile screen rebuild - Display name: ${authProvider.user?.displayName}');
+        print('🔵 Profile screen rebuild - First name: ${authProvider.user?.firstName}');
+        print('🔵 Profile screen rebuild - Last name: ${authProvider.user?.lastName}');
+        print('🔵 Profile screen rebuild - Phone: ${authProvider.user?.phone}');
+        print('🔵 Profile screen rebuild - Location: ${authProvider.user?.location}');
+        print('🔵 Profile screen rebuild - Bio: ${authProvider.user?.bio}');
+        
         return Scaffold(
           backgroundColor: AppTheme.lightGray,
           body: CustomScrollView(
@@ -247,15 +255,6 @@ Widget _buildSliverAppBar(AuthProvider authProvider) {
                         ),
                       ),
                     ),
-                    // Rating for farmers
-                    if (user?.userType == 'farmer' && user?.rating != null) ...[
-                      const SizedBox(height: 8),
-                      ProfileRatingWidget(
-                        rating: user!.rating!,
-                        totalReviews: user.totalReviews ?? 0,
-                        showReviews: false,
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -988,8 +987,8 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
             onPressed: () async {
               await authProvider.updateUserProfile(
                 displayName: authProvider.user!.displayName!,
-                phone: authProvider.user!.phone!,
-                location: authProvider.user!.location!,
+                phone: authProvider.user!.phone ?? '',
+                location: authProvider.user!.location ?? '',
                 bio: bioController.text,
                 profileImage: authProvider.profileImageFile,
               );

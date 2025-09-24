@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/crop_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/gradient_button.dart';
-import 'ai_analysis_result_screen.dart';
+import 'ai_analysis_report_screen.dart';
 
 class AIPredictionScreen extends StatefulWidget {
   const AIPredictionScreen({super.key});
@@ -127,7 +127,7 @@ class _AIPredictionScreenState extends State<AIPredictionScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => const AIAnalysisResultScreen(),
+            builder: (context) => const AIAnalysisReportScreen(),
           ),
         );
       }

@@ -1,74 +1,47 @@
+"""
+Simple backend without image processing for testing
+"""
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import firebase_admin
-from firebase_admin import credentials, auth, firestore
-import os
-from typing import Optional, List, Dict, Any
 import uvicorn
-from datetime import datetime
+import json
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="GreenPredict Backend API",
-    description="Backend API for GreenPredict - AI-powered agricultural prediction platform",
+    title="GreenPredict Backend API (Simple)",
+    description="Simple backend API for GreenPredict",
     version="1.0.0"
 )
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with your Flutter app's domain
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Initialize Firebase Admin SDK
-def initialize_firebase():
-    """Initialize Firebase Admin SDK"""
-    if not firebase_admin._apps:
-        # Check if service account key file exists
-        service_account_path = "serviceAccountKey.json"
-        if os.path.exists(service_account_path):
-            cred = credentials.Certificate(service_account_path)
-            firebase_admin.initialize_app(cred)
-        else:
-            # For development, you can use default credentials
-            # Make sure to set GOOGLE_APPLICATION_CREDENTIALS environment variable
-            firebase_admin.initialize_app()
-    
-    return firestore.client()
-
-# Initialize Firebase
-try:
-    db = initialize_firebase()
-    print("Firebase initialized successfully!")
-except Exception as e:
-    print(f"Firebase initialization failed: {e}")
-    db = None
-
-# Security
+# Simple authentication
 security = HTTPBearer()
 
-# Dependency to get current user
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Get current authenticated user from Firebase token"""
+    """Simple authentication for testing"""
     try:
-        # Verify the Firebase token
-        decoded_token = auth.verify_id_token(credentials.credentials)
-        uid = decoded_token['uid']
-        
-        # Get user data from Firestore
-        user_doc = db.collection('users').document(uid).get()
-        if user_doc.exists:
-            user_data = user_doc.to_dict()
-            user_data['uid'] = uid
-            return user_data
+        if credentials.credentials.startswith("test_"):
+            return {
+                "uid": "test_user_123",
+                "email": "testuser@example.com",
+                "first_name": "Test",
+                "last_name": "User",
+                "display_name": "Test User",
+                "user_type": "farmer"
+            }
         else:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials"
             )
     except Exception as e:
         raise HTTPException(
@@ -80,39 +53,96 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def root():
     """Root endpoint"""
     return {
-        "message": "Welcome to GreenPredict Backend API",
+        "message": "Welcome to GreenPredict Backend API (Simple)",
         "version": "1.0.0",
         "status": "running"
     }
 
+@app.get("/ping")
+async def ping():
+    """Lightweight ping endpoint"""
+    return {"pong": True}
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "GreenPredict Backend"}
+    return {"status": "healthy", "service": "GreenPredict Backend (Simple)"}
 
-# Simple test endpoints
-@app.get("/test")
-async def test_endpoint():
-    """Test endpoint"""
-    return {"message": "Backend is working!", "timestamp": datetime.now()}
-
-@app.get("/test-firebase")
-async def test_firebase():
-    """Test Firebase connection"""
-    if db is None:
-        return {"error": "Firebase not initialized"}
+# Simple auth endpoints
+@app.post("/auth/register")
+async def register(register_data: dict):
+    """Simple registration for testing"""
+    email = register_data.get("email")
+    password = register_data.get("password")
+    firstName = register_data.get("firstName", "New")
+    lastName = register_data.get("lastName", "User")
+    userType = register_data.get("userType", "farmer")
     
-    try:
-        # Test Firestore connection
-        test_doc = db.collection('test').document('connection').get()
-        return {"message": "Firebase connection successful", "firestore": "connected"}
-    except Exception as e:
-        return {"error": f"Firebase connection failed: {str(e)}"}
+    # Accept any registration for testing
+    if email and password:
+        user_data = {
+            "uid": f"user_{hash(email) % 10000}",
+            "email": email,
+            "first_name": firstName,
+            "last_name": lastName,
+            "display_name": f"{firstName} {lastName}",
+            "user_type": userType
+        }
+        
+        return {
+            "access_token": f"test_token_{hash(email) % 10000}",
+            "user": user_data
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email and password are required"
+        )
+
+@app.post("/auth/login")
+async def login(login_data: dict):
+    """Simple login for testing"""
+    email = login_data.get("email")
+    password = login_data.get("password")
+    
+    # Accept any email/password for testing
+    if email and password:
+        user_data = {
+            "uid": "test_user_123",
+            "email": email,
+            "first_name": "Test",
+            "last_name": "User",
+            "display_name": "Test User",
+            "user_type": "farmer"
+        }
+        
+        return {
+            "access_token": "test_token_123",
+            "user": user_data
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+
+@app.get("/profile/")
+async def get_profile(current_user: dict = Depends(get_current_user)):
+    """Get user profile"""
+    return current_user
+
+@app.post("/profile/upload-image")
+async def upload_profile_image(file, current_user: dict = Depends(get_current_user)):
+    """Upload profile image (mock)"""
+    return {
+        "message": "Profile image uploaded successfully",
+        "image_url": "http://localhost:8001/static/test_image.jpg"
+    }
 
 if __name__ == "__main__":
     uvicorn.run(
         "main_simple:app",
         host="0.0.0.0",
-        port=8000,
+        port=8001,
         reload=True
     )

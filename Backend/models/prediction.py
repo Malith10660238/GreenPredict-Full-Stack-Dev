@@ -7,8 +7,8 @@ class InputParameters(BaseModel):
     planning_year: str
     location: str
     season: str
-    temperature: str
-    soil_type: str
+    temperature: Optional[str] = None
+    soil_type: Optional[str] = None
     land_area: str
     crop: str
 
@@ -64,8 +64,8 @@ class PredictionRequest(BaseModel):
     planning_year: str
     location: str
     season: str
-    temperature: str
-    soil_type: str
+    temperature: Optional[str] = None
+    soil_type: Optional[str] = None
     land_area: str
     crop: str
 

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
 import os
@@ -34,7 +35,9 @@ def initialize_firebase():
         service_account_path = "serviceAccountKey.json"
         if os.path.exists(service_account_path):
             cred = credentials.Certificate(service_account_path)
-            firebase_admin.initialize_app(cred)
+            firebase_admin.initialize_app(cred, {
+                'storageBucket': 'green-predict.firebasestorage.app'  # Update this with your actual bucket name
+            })
         else:
             # For development, you can use default credentials
             # Make sure to set GOOGLE_APPLICATION_CREDENTIALS environment variable
@@ -53,6 +56,9 @@ app.include_router(auth_router.router, prefix="/auth", tags=["Authentication"])
 app.include_router(prediction_router.router, prefix="/prediction", tags=["AI Prediction"])
 app.include_router(listings_router.router, prefix="/listings", tags=["Marketplace"])
 app.include_router(profile_router.router, prefix="/profile", tags=["User Profile"])
+
+# Mount static files for serving uploaded images
+app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 @app.get("/")
 async def root():

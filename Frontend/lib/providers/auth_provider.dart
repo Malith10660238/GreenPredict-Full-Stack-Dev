@@ -206,15 +206,15 @@ class AuthProvider with ChangeNotifier {
     _setError(null);
 
     try {
-      // Prepare profile data for backend
+      // Prepare profile data for backend (using camelCase to match backend expectations)
       final profileData = {
-        'display_name': displayName,
+        'displayName': displayName,
         'phone': phone,
         'location': location,
         'bio': bio,
-        'farm_name': farmName,
-        'farm_size': farmSize,
-        'farming_experience': farmingExperience,
+        'farmName': farmName,
+        'farmSize': farmSize,
+        'farmingExperience': farmingExperience,
         'certification': certification,
         'preferences': preferences,
       };
@@ -222,11 +222,11 @@ class AuthProvider with ChangeNotifier {
       // Extract first and last name from display name
       final nameParts = displayName.trim().split(' ');
       if (nameParts.isNotEmpty) {
-        profileData['first_name'] = nameParts[0];
+        profileData['firstName'] = nameParts[0];
         if (nameParts.length > 1) {
-          profileData['last_name'] = nameParts.sublist(1).join(' ');
+          profileData['lastName'] = nameParts.sublist(1).join(' ');
         } else {
-          profileData['last_name'] = '';
+          profileData['lastName'] = '';
         }
       }
 
@@ -241,27 +241,33 @@ class AuthProvider with ChangeNotifier {
       final response = await _apiService.updateProfile(profileData, _authToken!);
       print('🔵 Profile update response: $response');
       
-      if (response['uid'] != null) {
-        // Update local user data with backend response
+      if (response['uid'] != null || response['user'] != null) {
+        // Get user data from response (handle both direct response and nested user object)
+        final userData = response['user'] ?? response;
+        
+        // Update local user data with backend response (handle both camelCase and snake_case)
         _user = _user!.copyWith(
-          firstName: response['first_name'],
-          lastName: response['last_name'],
-          displayName: response['display_name'],
-          phone: response['phone'],
-          location: response['location'],
-          bio: response['bio'],
-          farmName: response['farmer_profile']?['farm_name'],
-          farmSize: response['farmer_profile']?['farm_size'],
-          farmingExperience: response['farmer_profile']?['farming_experience'],
-          certification: response['farmer_profile']?['certification'],
-          preferences: response['consumer_profile']?['preferences']?.cast<String>(),
+          firstName: userData['firstName'] ?? userData['first_name'],
+          lastName: userData['lastName'] ?? userData['last_name'],
+          displayName: userData['displayName'] ?? userData['display_name'],
+          phone: userData['phone'],
+          location: userData['location'],
+          bio: userData['bio'],
+          farmName: userData['farmerProfile']?['farmName'] ?? userData['farmer_profile']?['farm_name'],
+          farmSize: userData['farmerProfile']?['farmSize'] ?? userData['farmer_profile']?['farm_size'],
+          farmingExperience: userData['farmerProfile']?['farmingExperience'] ?? userData['farmer_profile']?['farming_experience'],
+          certification: userData['farmerProfile']?['certification'] ?? userData['farmer_profile']?['certification'],
+          preferences: userData['consumerProfile']?['preferences']?.cast<String>() ?? userData['consumer_profile']?['preferences']?.cast<String>(),
         );
         
         // Handle profile image update if provided
-        if (response['profile_image_url'] != null) {
-          // Store the image URL for display
-          _profileImageUrl = response['profile_image_url'];
+        if (userData['profileImageUrl'] != null) {
+          _profileImageUrl = userData['profileImageUrl'];
+        } else if (userData['profile_image_url'] != null) {
+          _profileImageUrl = userData['profile_image_url'];
         }
+        
+        print('🔵 Updated local user data: ${_user?.displayName}, ${_user?.phone}, ${_user?.location}');
         
         // Notify listeners that user data has been updated
         notifyListeners();
@@ -275,6 +281,11 @@ class AuthProvider with ChangeNotifier {
           print('🔵 Image upload response: $imageResponse');
           if (imageResponse['image_url'] != null) {
             _profileImageUrl = imageResponse['image_url'];
+            _profileImageFile = profileImage;
+            print('🔵 Profile image URL updated: $_profileImageUrl');
+            notifyListeners();
+          } else if (imageResponse['imageUrl'] != null) {
+            _profileImageUrl = imageResponse['imageUrl'];
             _profileImageFile = profileImage;
             print('🔵 Profile image URL updated: $_profileImageUrl');
             notifyListeners();
@@ -323,41 +334,45 @@ class AuthProvider with ChangeNotifier {
           
           // Debug logging
           print('🔵 User data from backend: $userData');
-          print('🔵 Display name: ${userData['display_name']}');
+          print('🔵 Display name: ${userData['displayName'] ?? userData['display_name']}');
           
           // Convert backend user data to AppUser
           _user = AppUser(
-            firstName: userData['first_name'],
-            lastName: userData['last_name'],
-            displayName: userData['display_name'],
+            firstName: userData['firstName'] ?? userData['first_name'],
+            lastName: userData['lastName'] ?? userData['last_name'],
+            displayName: userData['displayName'] ?? userData['display_name'],
             email: userData['email'],
             uid: userData['uid'],
-            userType: userData['user_type'],
+            userType: userData['userType'] ?? userData['user_type'],
             phone: userData['phone'],
             location: userData['location'],
             bio: userData['bio'],
-            joinDate: userData['join_date'] != null 
-                ? DateTime.parse(userData['join_date']) 
-                : DateTime.now(),
+            joinDate: userData['joinDate'] != null
+                ? DateTime.parse(userData['joinDate'])
+                : userData['join_date'] != null
+                    ? DateTime.parse(userData['join_date'])
+                    : DateTime.now(),
             rating: userData['rating']?.toDouble(),
-            totalReviews: userData['total_reviews'],
+            totalReviews: userData['totalReviews'] ?? userData['total_reviews'],
             // Farmer-specific data
-            farmName: userData['farmer_profile']?['farm_name'],
-            farmSize: userData['farmer_profile']?['farm_size'],
-            crops: userData['farmer_profile']?['crops']?.cast<String>(),
-            farmingExperience: userData['farmer_profile']?['farming_experience'],
-            totalListings: userData['farmer_profile']?['total_listings'],
-            totalSales: userData['farmer_profile']?['total_sales'],
-            certification: userData['farmer_profile']?['certification'],
+            farmName: userData['farmerProfile']?['farmName'] ?? userData['farmer_profile']?['farm_name'],
+            farmSize: userData['farmerProfile']?['farmSize'] ?? userData['farmer_profile']?['farm_size'],
+            crops: userData['farmerProfile']?['crops']?.cast<String>() ?? userData['farmer_profile']?['crops']?.cast<String>(),
+            farmingExperience: userData['farmerProfile']?['farmingExperience'] ?? userData['farmer_profile']?['farming_experience'],
+            totalListings: userData['farmerProfile']?['totalListings'] ?? userData['farmer_profile']?['total_listings'],
+            totalSales: userData['farmerProfile']?['totalSales'] ?? userData['farmer_profile']?['total_sales'],
+            certification: userData['farmerProfile']?['certification'] ?? userData['farmer_profile']?['certification'],
             // Consumer-specific data
-            preferences: userData['consumer_profile']?['preferences']?.cast<String>(),
-            totalOrders: userData['consumer_profile']?['total_orders'],
-            totalSpent: userData['consumer_profile']?['total_spent']?.toDouble(),
-            favoriteCrops: userData['consumer_profile']?['favorite_crops']?.cast<String>(),
+            preferences: userData['consumerProfile']?['preferences']?.cast<String>() ?? userData['consumer_profile']?['preferences']?.cast<String>(),
+            totalOrders: userData['consumerProfile']?['totalOrders'] ?? userData['consumer_profile']?['total_orders'],
+            totalSpent: userData['consumerProfile']?['totalSpent']?.toDouble() ?? userData['consumer_profile']?['total_spent']?.toDouble(),
+            favoriteCrops: userData['consumerProfile']?['favoriteCrops']?.cast<String>() ?? userData['consumer_profile']?['favorite_crops']?.cast<String>(),
           );
           
           // Handle profile image if provided
-          if (userData['profile_image_url'] != null) {
+          if (userData['profileImageUrl'] != null) {
+            _profileImageUrl = userData['profileImageUrl'];
+          } else if (userData['profile_image_url'] != null) {
             _profileImageUrl = userData['profile_image_url'];
           }
           

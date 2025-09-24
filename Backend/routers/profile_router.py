@@ -6,7 +6,7 @@ import base64
 
 from models.user import UserUpdate, UserResponse, FarmerProfile, ConsumerProfile
 from auth_dependencies import get_current_user
-from storage_service import storage_service
+from local_storage_service import local_storage_service
 
 router = APIRouter()
 
@@ -58,6 +58,7 @@ async def update_profile(
         # Update basic profile data
         if update_data:
             user_ref.update(update_data)
+            print(f"✅ Updated user document in users collection")
         
         # Update farmer profile if user is a farmer and has farmer-specific data
         if current_user.get('user_type') == 'farmer' and farmer_profile_data:
@@ -73,6 +74,44 @@ async def update_profile(
                 'farmer_profile': updated_farmer_profile,
                 'updated_at': datetime.now()
             })
+            
+            # Also update the farmers collection
+            farmer_ref = db.collection('farmers').document(current_user['uid'])
+            farmer_update_data = {
+                "firstName": update_data.get('first_name'),
+                "lastName": update_data.get('last_name'),
+                "displayName": update_data.get('display_name'),
+                "phone": update_data.get('phone'),
+                "location": update_data.get('location'),
+                "bio": update_data.get('bio'),
+                "updatedAt": datetime.now()
+            }
+            # Remove None values
+            farmer_update_data = {k: v for k, v in farmer_update_data.items() if v is not None}
+            
+            if farmer_update_data:
+                farmer_ref.update(farmer_update_data)
+                print(f"✅ Updated farmer document in farmers collection")
+        
+        # Update consumer profile if user is a consumer
+        elif current_user.get('user_type') == 'consumer':
+            # Also update the consumers collection
+            consumer_ref = db.collection('consumers').document(current_user['uid'])
+            consumer_update_data = {
+                "firstName": update_data.get('first_name'),
+                "lastName": update_data.get('last_name'),
+                "displayName": update_data.get('display_name'),
+                "phone": update_data.get('phone'),
+                "location": update_data.get('location'),
+                "bio": update_data.get('bio'),
+                "updatedAt": datetime.now()
+            }
+            # Remove None values
+            consumer_update_data = {k: v for k, v in consumer_update_data.items() if v is not None}
+            
+            if consumer_update_data:
+                consumer_ref.update(consumer_update_data)
+                print(f"✅ Updated consumer document in consumers collection")
         
         # Get updated user data
         updated_doc = user_ref.get()
@@ -300,13 +339,10 @@ async def upload_profile_image(
         # Read file data
         file_data = await file.read()
         
-        # Resize image
-        resized_data = await storage_service.resize_image(file_data)
-        
-        # Upload to Firebase Storage
-        image_url = await storage_service.upload_profile_image(
+        # Upload to local storage
+        image_url = await local_storage_service.upload_profile_image(
             current_user['uid'],
-            resized_data,
+            file_data,
             file.content_type
         )
         
@@ -358,8 +394,8 @@ async def delete_profile_image(
         current_image_url = user_data.get('profile_image_url')
         
         if current_image_url:
-            # Delete from Firebase Storage
-            await storage_service.delete_profile_image(current_image_url)
+            # Delete from local storage
+            await local_storage_service.delete_image(current_image_url)
         
         # Remove image URL from user document
         user_ref.update({

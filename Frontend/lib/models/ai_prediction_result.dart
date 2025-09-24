@@ -16,17 +16,61 @@ class AIPredictionResult {
   });
 
   factory AIPredictionResult.fromJson(Map<String, dynamic> json) {
+    print('🔵 AIPredictionResult.fromJson: Parsing data...');
+    print('🔵 Keys in json: ${json.keys.toList()}');
+    
+    // Safely handle the lists with proper null checking
+    List<SeasonRecommendation> bestUpcomingSeasons = [];
+    if (json['best_upcoming_seasons'] != null) {
+      print('🔵 Found best_upcoming_seasons field');
+      final seasonsList = json['best_upcoming_seasons'] as List<dynamic>?;
+      print('🔵 Seasons list type: ${seasonsList.runtimeType}');
+      if (seasonsList != null) {
+        bestUpcomingSeasons = seasonsList
+            .map((e) => SeasonRecommendation.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    } else if (json['bestUpcomingSeasons'] != null) {
+      print('🔵 Found bestUpcomingSeasons field');
+      final seasonsList = json['bestUpcomingSeasons'] as List<dynamic>?;
+      print('🔵 Seasons list type: ${seasonsList.runtimeType}');
+      if (seasonsList != null) {
+        bestUpcomingSeasons = seasonsList
+            .map((e) => SeasonRecommendation.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    }
+
+    List<AlternativeCrop> alternativeCrops = [];
+    if (json['alternative_crops'] != null) {
+      print('🔵 Found alternative_crops field');
+      final cropsList = json['alternative_crops'] as List<dynamic>?;
+      print('🔵 Crops list type: ${cropsList.runtimeType}');
+      if (cropsList != null) {
+        alternativeCrops = cropsList
+            .map((e) => AlternativeCrop.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    } else if (json['alternativeCrops'] != null) {
+      print('🔵 Found alternativeCrops field');
+      final cropsList = json['alternativeCrops'] as List<dynamic>?;
+      print('🔵 Crops list type: ${cropsList.runtimeType}');
+      if (cropsList != null) {
+        alternativeCrops = cropsList
+            .map((e) => AlternativeCrop.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    }
+
+    print('🔵 Creating AIPredictionResult with ${bestUpcomingSeasons.length} seasons and ${alternativeCrops.length} alternative crops');
+    
     return AIPredictionResult(
-      inputParameters: InputParameters.fromJson(json['inputParameters']),
-      currentSeasonRecommendation: CurrentSeasonRecommendation.fromJson(json['currentSeasonRecommendation']),
-      bestUpcomingSeasons: (json['bestUpcomingSeasons'] as List)
-          .map((e) => SeasonRecommendation.fromJson(e))
-          .toList(),
-      yieldProfitabilityAnalysis: YieldProfitabilityAnalysis.fromJson(json['yieldProfitabilityAnalysis']),
-      riskAssessment: RiskAssessment.fromJson(json['riskAssessment']),
-      alternativeCrops: (json['alternativeCrops'] as List)
-          .map((e) => AlternativeCrop.fromJson(e))
-          .toList(),
+      inputParameters: InputParameters.fromJson(json['input_parameters'] ?? json['inputParameters']),
+      currentSeasonRecommendation: CurrentSeasonRecommendation.fromJson(json['current_season_recommendation'] ?? json['currentSeasonRecommendation']),
+      bestUpcomingSeasons: bestUpcomingSeasons,
+      yieldProfitabilityAnalysis: YieldProfitabilityAnalysis.fromJson(json['yield_profitability_analysis'] ?? json['yieldProfitabilityAnalysis']),
+      riskAssessment: RiskAssessment.fromJson(json['risk_assessment'] ?? json['riskAssessment']),
+      alternativeCrops: alternativeCrops,
     );
   }
 }
@@ -52,13 +96,13 @@ class InputParameters {
 
   factory InputParameters.fromJson(Map<String, dynamic> json) {
     return InputParameters(
-      planningYear: json['planningYear'],
-      location: json['location'],
-      season: json['season'],
-      temperature: json['temperature'],
-      soilType: json['soilType'],
-      landArea: json['landArea'],
-      crop: json['crop'],
+      planningYear: json['planning_year']?.toString() ?? json['planningYear']?.toString() ?? '2025',
+      location: json['location']?.toString() ?? 'Colombo',
+      season: json['season']?.toString() ?? 'Yala',
+      temperature: json['temperature']?.toString() ?? '28.0',
+      soilType: json['soil_type']?.toString() ?? json['soilType']?.toString() ?? 'Latosols',
+      landArea: json['land_area']?.toString() ?? json['landArea']?.toString() ?? '1.0',
+      crop: json['crop']?.toString() ?? 'Cabbage',
     );
   }
 }
@@ -78,10 +122,10 @@ class CurrentSeasonRecommendation {
 
   factory CurrentSeasonRecommendation.fromJson(Map<String, dynamic> json) {
     return CurrentSeasonRecommendation(
-      recommendedCrop: json['recommendedCrop'],
-      suitabilityScore: json['suitabilityScore'],
-      reasons: List<String>.from(json['reasons']),
-      plantingTips: List<String>.from(json['plantingTips']),
+      recommendedCrop: json['recommended_crop']?.toString() ?? json['recommendedCrop']?.toString() ?? 'Unknown',
+      suitabilityScore: (json['suitability_score'] ?? json['suitabilityScore'] ?? 0) as int,
+      reasons: List<String>.from(json['reasons'] ?? []),
+      plantingTips: List<String>.from(json['planting_tips'] ?? json['plantingTips'] ?? []),
     );
   }
 }
@@ -100,12 +144,21 @@ class SeasonRecommendation {
   });
 
   factory SeasonRecommendation.fromJson(Map<String, dynamic> json) {
-    return SeasonRecommendation(
-      season: json['season'],
-      suitabilityScore: json['suitabilityScore'],
-      expectedYield: json['expectedYield'],
-      profitabilityRating: json['profitabilityRating'],
-    );
+    print('🔵 SeasonRecommendation.fromJson: Parsing season data');
+    print('🔵 Season keys: ${json.keys.toList()}');
+    
+    try {
+      return SeasonRecommendation(
+        season: json['season']?.toString() ?? 'Unknown',
+        suitabilityScore: (json['suitability_score'] ?? json['suitabilityScore'] ?? 0) as int,
+        expectedYield: json['expected_yield']?.toString() ?? json['expectedYield']?.toString() ?? 'N/A',
+        profitabilityRating: json['profitability_rating']?.toString() ?? json['profitabilityRating']?.toString() ?? 'Unknown',
+      );
+    } catch (e) {
+      print('❌ SeasonRecommendation.fromJson error: $e');
+      print('❌ Season data: $json');
+      rethrow;
+    }
   }
 }
 
@@ -128,12 +181,12 @@ class YieldProfitabilityAnalysis {
 
   factory YieldProfitabilityAnalysis.fromJson(Map<String, dynamic> json) {
     return YieldProfitabilityAnalysis(
-      expectedYield: json['expectedYield'],
-      estimatedRevenue: json['estimatedRevenue'],
-      estimatedCosts: json['estimatedCosts'],
-      netProfit: json['netProfit'],
-      profitMargin: json['profitMargin'],
-      breakEvenTime: json['breakEvenTime'],
+      expectedYield: json['expected_yield']?.toString() ?? json['expectedYield']?.toString() ?? 'N/A',
+      estimatedRevenue: json['estimated_revenue']?.toString() ?? json['estimatedRevenue']?.toString() ?? 'N/A',
+      estimatedCosts: json['estimated_costs']?.toString() ?? json['estimatedCosts']?.toString() ?? 'N/A',
+      netProfit: json['net_profit']?.toString() ?? json['netProfit']?.toString() ?? 'N/A',
+      profitMargin: json['profit_margin']?.toString() ?? json['profitMargin']?.toString() ?? 'N/A',
+      breakEvenTime: json['break_even_time']?.toString() ?? json['breakEvenTime']?.toString() ?? 'N/A',
     );
   }
 }
@@ -155,11 +208,11 @@ class RiskAssessment {
 
   factory RiskAssessment.fromJson(Map<String, dynamic> json) {
     return RiskAssessment(
-      overallRisk: json['overallRisk'],
-      weatherRisk: json['weatherRisk'],
-      marketRisk: json['marketRisk'],
-      pestDiseaseRisk: json['pestDiseaseRisk'],
-      recommendations: List<String>.from(json['recommendations']),
+      overallRisk: json['overall_risk']?.toString() ?? json['overallRisk']?.toString() ?? 'Unknown',
+      weatherRisk: json['weather_risk']?.toString() ?? json['weatherRisk']?.toString() ?? 'Unknown',
+      marketRisk: json['market_risk']?.toString() ?? json['marketRisk']?.toString() ?? 'Unknown',
+      pestDiseaseRisk: json['pest_disease_risk']?.toString() ?? json['pestDiseaseRisk']?.toString() ?? 'Unknown',
+      recommendations: List<String>.from(json['recommendations'] ?? []),
     );
   }
 }
@@ -178,11 +231,20 @@ class AlternativeCrop {
   });
 
   factory AlternativeCrop.fromJson(Map<String, dynamic> json) {
-    return AlternativeCrop(
-      name: json['name'],
-      suitabilityScore: json['suitabilityScore'],
-      expectedProfit: json['expectedProfit'],
-      growthPeriod: json['growthPeriod'],
-    );
+    print('🔵 AlternativeCrop.fromJson: Parsing crop data');
+    print('🔵 Crop keys: ${json.keys.toList()}');
+    
+    try {
+      return AlternativeCrop(
+        name: json['name']?.toString() ?? 'Unknown',
+        suitabilityScore: (json['suitability_score'] ?? json['suitabilityScore'] ?? 0) as int,
+        expectedProfit: json['expected_profit']?.toString() ?? json['expectedProfit']?.toString() ?? 'N/A',
+        growthPeriod: json['growth_period']?.toString() ?? json['growthPeriod']?.toString() ?? 'N/A',
+      );
+    } catch (e) {
+      print('❌ AlternativeCrop.fromJson error: $e');
+      print('❌ Crop data: $json');
+      rethrow;
+    }
   }
 }

@@ -17,8 +17,72 @@ from models.prediction import (
     PredictionHistory
 )
 from auth_dependencies import get_current_user
+from ai_model_service import ai_service
+
+def convert_to_camel_case(data):
+    """Convert snake_case keys to camelCase for Flutter compatibility"""
+    if isinstance(data, dict):
+        return {to_camel_case(key): convert_to_camel_case(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [convert_to_camel_case(item) for item in data]
+    else:
+        return data
+
+def to_camel_case(snake_str):
+    """Convert snake_case string to camelCase"""
+    components = snake_str.split('_')
+    return components[0] + ''.join(x.capitalize() for x in components[1:])
 
 router = APIRouter()
+
+@router.post("/test-analyze", response_model=PredictionResponse)
+async def test_analyze_crop_prediction(prediction_data: PredictionRequest):
+    """Test endpoint for crop prediction analysis (no authentication required)"""
+    try:
+        db = firestore.client()
+        
+        # Generate prediction ID
+        prediction_id = str(uuid.uuid4())
+        
+        # Create input parameters object
+        input_params = InputParameters(
+            planning_year=prediction_data.planning_year,
+            location=prediction_data.location,
+            season=prediction_data.season,
+            temperature=prediction_data.temperature,
+            soil_type=prediction_data.soil_type,
+            land_area=prediction_data.land_area,
+            crop=prediction_data.crop
+        )
+        
+        # Generate AI prediction result using the trained model
+        prediction_result = generate_ai_prediction(input_params)
+        
+        # Save prediction to Firestore (optional for test)
+        try:
+            prediction_doc = {
+                'prediction_id': prediction_id,
+                'user_id': 'test_user',
+                'input_parameters': input_params.dict(),
+                'result': prediction_result.dict(),
+                'created_at': datetime.now()
+            }
+            db.collection('predictions').document(prediction_id).set(prediction_doc)
+        except Exception as e:
+            print(f"Warning: Could not save to Firestore: {e}")
+        
+        return PredictionResponse(
+            prediction_id=prediction_id,
+            result=prediction_result,
+            created_at=datetime.now(),
+            user_id='test_user'
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Prediction analysis failed: {str(e)}"
+        )
 
 @router.post("/analyze", response_model=PredictionResponse)
 async def analyze_crop_prediction(
@@ -43,9 +107,8 @@ async def analyze_crop_prediction(
             crop=prediction_data.crop
         )
         
-        # Generate AI prediction result (mock implementation)
-        # In a real application, this would call your ML model
-        prediction_result = generate_mock_prediction(input_params)
+        # Generate AI prediction result using the trained model
+        prediction_result = generate_ai_prediction(input_params)
         
         # Save prediction to Firestore
         prediction_doc = {
@@ -152,106 +215,118 @@ async def get_prediction_by_id(
             detail=f"Failed to fetch prediction: {str(e)}"
         )
 
-def generate_mock_prediction(input_params: InputParameters) -> AIPredictionResult:
-    """Generate mock prediction result (replace with actual ML model)"""
+def generate_ai_prediction(input_params: InputParameters) -> AIPredictionResult:
+    """Generate AI prediction result using the trained model"""
     
-    # Mock current season recommendation
+    # Convert string parameters to appropriate types
+    try:
+        temperature = float(input_params.temperature) if input_params.temperature and input_params.temperature != "null" else None
+        land_area = float(input_params.land_area) if input_params.land_area else 1.0
+    except (ValueError, TypeError):
+        temperature = None
+        land_area = 1.0
+    
+    # Get AI prediction from the model - let AI service use defaults when None
+    ai_result = ai_service.predict_crop_recommendation(
+        district=input_params.location,
+        season=input_params.season,
+        crop_name=input_params.crop,
+        soil_type=input_params.soil_type if input_params.soil_type and input_params.soil_type != "null" else None,
+        temperature=temperature,
+        land_area=land_area
+    )
+    
+    # Extract results
+    recommendation = ai_result['recommendation']
+    yield_profit = ai_result['yield_profitability']
+    risk_assessment = ai_result['risk_assessment']
+    alternatives = ai_result['alternatives']
+    seasonal_analysis = ai_result['seasonal_analysis']
+    
+    # Get the actual values used by AI service (with defaults applied)
+    actual_input_params = ai_result['input_params']
+    actual_temperature = actual_input_params['temperature']
+    actual_soil_type = actual_input_params['soil_type']
+    
+    # Create current season recommendation
     current_season = CurrentSeasonRecommendation(
         recommended_crop=input_params.crop,
-        suitability_score=85,
+        suitability_score=int(recommendation['success_probability']),
         reasons=[
-            f"Optimal weather conditions for {input_params.crop} cultivation",
-            f"High market demand in {input_params.location} region",
-            f"Low pest risk during {input_params.season}",
-            "Water availability is sufficient"
+            f"Success probability: {recommendation['success_probability']:.1f}%",
+            f"Confidence level: {recommendation['confidence_level']}",
+            f"Decision: {recommendation['decision']}",
+            f"Expected yield: {yield_profit['yield_per_hectare']:,} kg/ha"
         ],
         planting_tips=[
-            "Plant during early morning hours",
-            "Ensure proper spacing between plants",
-            "Use organic fertilizers for better yield",
-            "Regular monitoring for pest control"
+            "Plant during optimal season timing",
+            "Ensure proper soil preparation",
+            "Monitor weather conditions regularly",
+            "Use recommended fertilizers and pesticides"
         ]
     )
     
-    # Mock upcoming seasons
-    upcoming_seasons = [
-        SeasonRecommendation(
-            season="Maha (October - March)",
-            suitability_score=92,
-            expected_yield="4.5 tons/acre",
-            profitability_rating="High"
-        ),
-        SeasonRecommendation(
-            season="Yala (April - September)",
-            suitability_score=78,
-            expected_yield="3.8 tons/acre",
-            profitability_rating="Medium"
-        )
-    ]
+    # Create upcoming seasons
+    upcoming_seasons = []
+    for season_data in seasonal_analysis:
+        upcoming_seasons.append(SeasonRecommendation(
+            season=season_data['season'],
+            suitability_score=int(season_data['success_percentage']),
+            expected_yield=f"{season_data['yield_kg_per_ha']:,} kg/ha",
+            profitability_rating="High" if season_data['profit_lkr_per_ha'] > 200000 else "Medium" if season_data['profit_lkr_per_ha'] > 100000 else "Low"
+        ))
     
-    # Mock yield analysis
+    # Create yield analysis
     yield_analysis = YieldProfitabilityAnalysis(
-        expected_yield="4.2 tons/acre",
-        estimated_revenue="Rs. 420,000/acre",
-        estimated_costs="Rs. 180,000/acre",
-        net_profit="Rs. 240,000/acre",
-        profit_margin="57%",
+        expected_yield=f"{yield_profit['yield_per_hectare']:,} kg/ha",
+        estimated_revenue=f"LKR {yield_profit['predicted_profit'] + yield_profit['estimated_cost']:,}",
+        estimated_costs=f"LKR {yield_profit['estimated_cost']:,}",
+        net_profit=f"LKR {yield_profit['predicted_profit']:,}",
+        profit_margin=f"{yield_profit['roi']:.1f}%",
         break_even_time="6 months"
     )
     
-    # Mock risk assessment
-    risk_assessment = RiskAssessment(
-        overall_risk="Medium",
-        weather_risk="Low",
-        market_risk="Medium",
+    # Create risk assessment
+    risk_level = "Low" if "Low risk" in risk_assessment else "Medium" if "Medium risk" in risk_assessment else "High"
+    risk_assessment_obj = RiskAssessment(
+        overall_risk=risk_level,
+        weather_risk="Low" if recommendation['success_probability'] > 70 else "Medium" if recommendation['success_probability'] > 50 else "High",
+        market_risk="Low" if yield_profit['predicted_profit'] > 0 else "High",
         pest_disease_risk="Low",
         recommendations=[
-            "Consider crop insurance for weather protection",
-            "Diversify with 2-3 different crops",
-            "Monitor market prices regularly",
-            "Implement IPM practices"
+            "Monitor weather conditions regularly",
+            "Implement proper irrigation systems",
+            "Use disease-resistant varieties",
+            "Follow integrated pest management practices"
         ]
     )
     
-    # Mock alternative crops
-    alternative_crops = [
-        AlternativeCrop(
-            name="Tomatoes",
-            suitability_score=88,
-            expected_profit="Rs. 320,000/acre",
-            growth_period="4 months"
-        ),
-        AlternativeCrop(
-            name="Onions",
-            suitability_score=82,
-            expected_profit="Rs. 280,000/acre",
-            growth_period="5 months"
-        ),
-        AlternativeCrop(
-            name="Carrots",
-            suitability_score=79,
-            expected_profit="Rs. 260,000/acre",
-            growth_period="3 months"
-        ),
-        AlternativeCrop(
-            name="Cabbage",
-            suitability_score=76,
-            expected_profit="Rs. 240,000/acre",
-            growth_period="3.5 months"
-        ),
-        AlternativeCrop(
-            name="Lettuce",
-            suitability_score=73,
-            expected_profit="Rs. 200,000/acre",
-            growth_period="2.5 months"
-        )
-    ]
+    # Create alternative crops
+    alternative_crops = []
+    for alt in alternatives:
+        alternative_crops.append(AlternativeCrop(
+            name=alt['crop_name'],
+            suitability_score=int(alt['success_probability']),
+            expected_profit=f"LKR {alt['profit_lkr_per_ha']:,}",
+            growth_period="4-6 months"
+        ))
+    
+    # Create InputParameters with actual values used by AI service
+    actual_input_params = InputParameters(
+        planning_year=input_params.planning_year,
+        location=input_params.location,
+        season=input_params.season,
+        temperature=str(actual_temperature) if actual_temperature is not None else None,
+        soil_type=actual_soil_type,
+        land_area=input_params.land_area,
+        crop=input_params.crop
+    )
     
     return AIPredictionResult(
-        input_parameters=input_params,
+        input_parameters=actual_input_params,
         current_season_recommendation=current_season,
         best_upcoming_seasons=upcoming_seasons,
         yield_profitability_analysis=yield_analysis,
-        risk_assessment=risk_assessment,
+        risk_assessment=risk_assessment_obj,
         alternative_crops=alternative_crops
     )

@@ -93,6 +93,22 @@ class ListingProvider with ChangeNotifier {
     notifyListeners();
   }
   
+  // Load existing images for editing
+  void loadExistingImages(List<String> imagePaths) {
+    _selectedImages = imagePaths.map((path) => File(path)).toList();
+    notifyListeners();
+  }
+  
+  // Add new images to existing ones
+  void addImagesToExisting(List<String> existingImagePaths) {
+    // Convert existing paths to File objects
+    List<File> existingFiles = existingImagePaths.map((path) => File(path)).toList();
+    
+    // Add new selected images to existing ones
+    _selectedImages = [...existingFiles, ..._selectedImages];
+    notifyListeners();
+  }
+  
   Future<void> loadListings() async {
     try {
       _setLoading(true);
@@ -103,6 +119,7 @@ class ListingProvider with ChangeNotifier {
       final listings = await apiService.getListings();
       
       _listings = listings;
+      notifyListeners();
       _setLoading(false);
     } catch (e) {
       _setLoading(false);
@@ -110,32 +127,105 @@ class ListingProvider with ChangeNotifier {
     }
   }
   
-Future<void> addListing(Map<String, dynamic> listingData, String token) async {
-  try {
-    _setLoading(true);
-    _setError(null);
-    
-    // Convert File objects to paths for storage
-    List<String> imagePaths = _selectedImages.map((file) => file.path).toList();
-    
-    // Prepare listing data for backend
-    final listingPayload = {
-      ...listingData,
-      'images': imagePaths,
-    };
-    
-    // Call the real backend API
-    final apiService = ApiService();
-    final newListing = await apiService.createListing(listingPayload, token);
-    
-    _listings.insert(0, newListing);
-    _selectedImages.clear(); // Clear selected images after adding
-    _setLoading(false);
-  } catch (e) {
-    _setLoading(false);
-    _setError('Failed to add listing. Please try again.');
+  Future<void> addListing(Map<String, dynamic> listingData, String token) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+      
+      // Convert File objects to paths for storage
+      List<String> imagePaths = _selectedImages.map((file) => file.path).toList();
+      
+      // Prepare listing data for backend
+      final listingPayload = {
+        ...listingData,
+        'images': imagePaths,
+      };
+      
+      // Call the real backend API
+      final apiService = ApiService();
+      final newListing = await apiService.createListing(listingPayload, token);
+      
+      _listings.insert(0, newListing);
+      _selectedImages.clear(); // Clear selected images after adding
+      notifyListeners();
+      _setLoading(false);
+    } catch (e) {
+      _setLoading(false);
+      _setError('Failed to add listing. Please try again.');
+    }
   }
-}
+  
+  Future<void> updateListing(String listingId, Map<String, dynamic> listingData, String token) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+      
+      // Always include images in the update data
+      // Convert File objects to paths for storage
+      List<String> imagePaths = _selectedImages.map((file) => file.path).toList();
+      listingData['images'] = imagePaths;
+      
+      print('🔵 Updating listing with images: $imagePaths');
+      
+      final apiService = ApiService();
+      final updatedListing = await apiService.updateListing(listingId, listingData, token);
+      
+      // Update the listing in the local list
+      final index = _listings.indexWhere((listing) => listing['id'] == listingId);
+      if (index != -1) {
+        _listings[index] = updatedListing;
+        notifyListeners();
+      }
+      
+      // Clear selected images after successful update
+      _selectedImages.clear();
+      _setLoading(false);
+    } catch (e) {
+      _setLoading(false);
+      _setError('Failed to update listing. Please try again.');
+    }
+  }
+  
+  Future<void> deleteListing(String listingId, String token) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+      
+      final apiService = ApiService();
+      await apiService.deleteListing(listingId, token);
+      
+      // Remove the listing from the local list
+      _listings.removeWhere((listing) => listing['id'] == listingId);
+      
+      // Remove from all users' favorites
+      for (final userId in _userFavorites.keys) {
+        _userFavorites[userId]?.remove(listingId);
+      }
+      
+      notifyListeners();
+      _setLoading(false);
+    } catch (e) {
+      _setLoading(false);
+      _setError('Failed to delete listing. Please try again.');
+    }
+  }
+  
+  Future<void> loadMyListings(String token) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+      
+      final apiService = ApiService();
+      final myListings = await apiService.getMyListings(token);
+      
+      _listings = myListings;
+      notifyListeners();
+      _setLoading(false);
+    } catch (e) {
+      _setLoading(false);
+      _setError('Failed to load my listings. Please try again.');
+    }
+  }
   
   Future<void> searchListings(String query) async {
     try {
@@ -163,6 +253,7 @@ Future<void> addListing(Map<String, dynamic> listingData, String token) async {
             .toList();
       }
       
+      notifyListeners();
       _setLoading(false);
     } catch (e) {
       _setLoading(false);
@@ -191,56 +282,18 @@ Future<void> addListing(Map<String, dynamic> listingData, String token) async {
     return _userFavorites[userId]?.contains(listingId) ?? false;
   }
 
-  // Delete listing functionality
-  Future<void> deleteListing(String listingId, String token) async {
-    try {
-      _setLoading(true);
-      _setError(null);
-      
-      // Call the real backend API
-      final apiService = ApiService();
-      await apiService.deleteListing(listingId, token);
-      
-      // Remove from local listings
-      _listings.removeWhere((listing) => listing['id'] == listingId);
-      
-      // Remove from all users' favorites
-      for (final userId in _userFavorites.keys) {
-        _userFavorites[userId]?.remove(listingId);
-      }
-      
-      _setLoading(false);
-    } catch (e) {
-      _setLoading(false);
-      _setError('Failed to delete listing. Please try again.');
-    }
-  }
-
-  // Update listing functionality
-  Future<void> updateListing(String listingId, Map<String, dynamic> updatedData, String token) async {
-    try {
-      _setLoading(true);
-      _setError(null);
-      
-      // Call the real backend API
-      final apiService = ApiService();
-      final updatedListing = await apiService.updateListing(listingId, updatedData, token);
-      
-      // Update the listing in local list
-      final index = _listings.indexWhere((listing) => listing['id'] == listingId);
-      if (index != -1) {
-        _listings[index] = updatedListing;
-      }
-      
-      _setLoading(false);
-    } catch (e) {
-      _setLoading(false);
-      _setError('Failed to update listing. Please try again.');
-    }
-  }
   
   void clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+  
+  // Get a specific listing by ID
+  Map<String, dynamic>? getListingById(String listingId) {
+    try {
+      return _listings.firstWhere((listing) => listing['id'] == listingId);
+    } catch (e) {
+      return null;
+    }
   }
 }

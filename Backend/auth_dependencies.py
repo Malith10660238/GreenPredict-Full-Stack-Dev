@@ -13,13 +13,8 @@ security = HTTPBearer()
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Get current authenticated user from Firebase token"""
     try:
-        # Try to verify as ID token first
+        # Try to verify as custom token first (since backend creates custom tokens)
         try:
-            decoded_token = auth.verify_id_token(credentials.credentials)
-            uid = decoded_token['uid']
-        except:
-            # If ID token verification fails, try to verify as custom token
-            # Custom tokens are JWT tokens that need to be verified differently
             import jwt
             import json
             
@@ -29,6 +24,16 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             uid = decoded_token.get('uid')
             
             if not uid:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token format"
+                )
+        except:
+            # If custom token verification fails, try to verify as ID token
+            try:
+                decoded_token = auth.verify_id_token(credentials.credentials)
+                uid = decoded_token['uid']
+            except:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid token format"

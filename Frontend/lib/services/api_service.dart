@@ -9,7 +9,7 @@ class ApiService {
   // API Endpoints
   static const String _authEndpoint = '/auth';
   static const String _predictionEndpoint = '/prediction';
-  static const String _listingsEndpoint = '/listings/';
+  static const String _listingsEndpoint = '/listings';
   static const String _profileEndpoint = '/profile/';
   
   // Headers
@@ -18,10 +18,13 @@ class ApiService {
     'Accept': 'application/json',
   };
   
-  Map<String, String> _authHeaders(String token) => {
-    ..._headers,
-    'Authorization': 'Bearer $token',
-  };
+  Map<String, String> _authHeaders(String token) {
+    print('🔵 Auth token: ${token.substring(0, 20)}...');
+    return {
+      ..._headers,
+      'Authorization': 'Bearer $token',
+    };
+  }
   
   // Authentication APIs
   Future<Map<String, dynamic>> login(String email, String password) async {
@@ -78,10 +81,36 @@ class ApiService {
       );
       
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.cast<Map<String, dynamic>>();
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        if (responseData['listings'] != null) {
+          return List<Map<String, dynamic>>.from(responseData['listings']);
+        } else {
+          return [];
+        }
       } else {
         throw Exception('Failed to fetch listings: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+  
+  Future<List<Map<String, dynamic>>> getMyListings(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl$_listingsEndpoint/my'),
+        headers: _authHeaders(token),
+      );
+      
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        if (responseData['listings'] != null) {
+          return List<Map<String, dynamic>>.from(responseData['listings']);
+        } else {
+          return [];
+        }
+      } else {
+        throw Exception('Failed to fetch my listings: ${response.reasonPhrase}');
       }
     } catch (e) {
       throw Exception('Network error: $e');
@@ -94,17 +123,73 @@ class ApiService {
   ) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl$_listingsEndpoint'),
+        Uri.parse('$baseUrl$_listingsEndpoint/'),
         headers: _authHeaders(token),
         body: jsonEncode(listingData),
       );
       
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        if (responseData['listing'] != null) {
+          return responseData['listing'];
+        } else {
+          return responseData;
+        }
       } else {
         throw Exception('Failed to create listing: ${response.reasonPhrase}');
       }
     } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+  
+  Future<Map<String, dynamic>> updateListing(
+    String listingId,
+    Map<String, dynamic> listingData,
+    String token,
+  ) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl$_listingsEndpoint/$listingId'),
+        headers: _authHeaders(token),
+        body: jsonEncode(listingData),
+      );
+      
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        if (responseData['listing'] != null) {
+          return responseData['listing'];
+        } else {
+          return responseData;
+        }
+      } else {
+        throw Exception('Failed to update listing: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+  
+  Future<void> deleteListing(String listingId, String token) async {
+    try {
+      final url = '$baseUrl$_listingsEndpoint/$listingId';
+      print('🔵 Delete URL: $url');
+      print('🔵 Listing ID: $listingId');
+      final response = await http.delete(
+        Uri.parse(url),
+        headers: _authHeaders(token),
+      );
+      
+      print('🔵 Delete response status: ${response.statusCode}');
+      print('🔵 Delete response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        return;
+      } else {
+        throw Exception('Failed to delete listing: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Delete error: $e');
       throw Exception('Network error: $e');
     }
   }
@@ -270,60 +355,41 @@ Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
   // AI Prediction API
   Future<Map<String, dynamic>> getPrediction(Map<String, dynamic> inputData) async {
     try {
+      // Convert frontend data format to backend format
+      final backendData = {
+        'planning_year': inputData['planningYear'] ?? '2025',
+        'location': inputData['district'] ?? 'Colombo',
+        'season': inputData['season'] ?? 'Yala',
+        'temperature': inputData['temperature']?.toString() ?? null,  // Let backend use district defaults
+        'soil_type': inputData['soilType'] ?? null,  // Let backend use district defaults
+        'land_area': inputData['landArea']?.toString() ?? '1.0',
+        'crop': inputData['crop'] ?? 'Cabbage',
+      };
+      
+      print('🔵 Sending prediction request to: $baseUrl/predictions/test-analyze');
+      print('🔵 Request data: $backendData');
+      
       final response = await http.post(
-        Uri.parse('$baseUrl$_predictionEndpoint/analyze'),
+        Uri.parse('$baseUrl/predictions/test-analyze'),
         headers: _headers,
-        body: jsonEncode(inputData),
+        body: jsonEncode(backendData),
       );
       
+      print('🔵 Response status: ${response.statusCode}');
+      print('🔵 Response body: ${response.body}');
+      
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final result = jsonDecode(response.body);
+        print('✅ Prediction successful!');
+        return result;
       } else {
+        print('❌ Prediction failed - Status: ${response.statusCode}, Body: ${response.body}');
         throw Exception('Prediction failed: ${response.reasonPhrase}');
       }
     } catch (e) {
+      print('❌ Network error during prediction: $e');
       throw Exception('Network error: $e');
     }
   }
 
-  // Delete listing
-  Future<void> deleteListing(String listingId, String token) async {
-    try {
-      final response = await http.delete(
-        Uri.parse('$baseUrl$_listingsEndpoint/$listingId'),
-        headers: _authHeaders(token),
-      );
-      
-      if (response.statusCode == 200) {
-        return;
-      } else {
-        throw Exception('Failed to delete listing: ${response.reasonPhrase}');
-      }
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
-  }
-  
-  // Update listing
-  Future<Map<String, dynamic>> updateListing(
-    String listingId,
-    Map<String, dynamic> listingData,
-    String token,
-  ) async {
-    try {
-      final response = await http.put(
-        Uri.parse('$baseUrl$_listingsEndpoint/$listingId'),
-        headers: _authHeaders(token),
-        body: jsonEncode(listingData),
-      );
-      
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception('Failed to update listing: ${response.reasonPhrase}');
-      }
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
-  }
 }

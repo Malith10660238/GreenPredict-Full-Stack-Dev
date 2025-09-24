@@ -803,13 +803,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       listing['location']?.toString() ?? 'Unknown',
                       style: AppTheme.caption.copyWith(fontSize: 11),
                     ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.star, size: 12, color: Colors.orange),
-                    const SizedBox(width: 2),
-                    Text(
-                      (listing['rating']?.toString() ?? '4.5'),
-                      style: AppTheme.caption.copyWith(fontSize: 11),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 3),

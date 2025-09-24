@@ -208,17 +208,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     color: Colors.orange.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.star, color: Colors.orange, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${widget.listing['rating']?.toString() ?? '4.5'}',
-                        style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
                 ),
                 const SizedBox(width: 12),
                 Consumer2<ListingProvider, AuthProvider>(

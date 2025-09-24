@@ -21,7 +21,12 @@ class StorageService:
         if self._bucket is None:
             if not firebase_admin._apps:
                 raise Exception("Firebase Admin SDK not initialized")
-            self._bucket = storage.bucket()
+            try:
+                self._bucket = storage.bucket()
+            except Exception as e:
+                print(f"Warning: Could not initialize Firebase Storage bucket: {e}")
+                print("Make sure Firebase Storage is enabled in your Firebase project")
+                raise Exception(f"Firebase Storage not available: {e}")
         return self._bucket
     
     async def upload_profile_image(

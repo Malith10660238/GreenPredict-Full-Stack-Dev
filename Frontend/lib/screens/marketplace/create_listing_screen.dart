@@ -809,7 +809,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         'farmerName': authProvider.user?.displayName ?? 'Unknown',
         'farmerId': authProvider.user?.uid ?? 'unknown',
         'contact': authProvider.user?.phone ?? '',
-        'rating': 4.5,
       };
 
       // Get the auth token
