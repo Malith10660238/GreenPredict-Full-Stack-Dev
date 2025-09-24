@@ -144,8 +144,13 @@ class AIAnalysisReportScreen extends StatelessWidget {
                 flexibleSpace: FlexibleSpaceBar(
                   title: Text(
                     'AI Analysis Report',
-                    style: AppTheme.heading3.copyWith(color: AppTheme.white),
+                    style: AppTheme.heading3.copyWith(
+                      color: AppTheme.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
+                  centerTitle: true,
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: AppTheme.primaryGradient,
@@ -636,47 +641,73 @@ class AIAnalysisReportScreen extends StatelessWidget {
 
   Widget _buildUpcomingSeasonsSection(List<dynamic> seasons, String cropName) {
     return Card(
-      elevation: 6,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [AppTheme.lightGreen, AppTheme.mintGreen],
+            colors: [
+              Colors.white,
+              AppTheme.lightGreen.withOpacity(0.1),
+            ],
           ),
         ),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: AppTheme.primaryGreen,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryGreen.withOpacity(0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
                   child: const Icon(
-                    Icons.calendar_today,
+                    Icons.trending_up_rounded,
                     color: AppTheme.white,
-                    size: 24,
+                    size: 32,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 20),
                 Expanded(
-                  child: Text(
-                    'Best Upcoming Seasons for $cropName',
-                    style: AppTheme.heading3.copyWith(
-                      color: AppTheme.textDark,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Upcoming Seasons for $cropName',
+                        style: AppTheme.heading3.copyWith(
+                          color: AppTheme.textDark,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'AI-powered seasonal recommendations',
+                        style: AppTheme.bodyMedium.copyWith(
+                          color: AppTheme.darkGray,
+                          fontSize: 14,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             ...seasons.map((season) => _buildSeasonCard(season)),
           ],
         ),
@@ -687,99 +718,195 @@ class AIAnalysisReportScreen extends StatelessWidget {
 
   Widget _buildSeasonCard(season) {
     final isRecommended = season.suitabilityScore >= 50;
-    final icon = isRecommended ? '✅' : '❌';
-    final cardColor = isRecommended ? AppTheme.lightGreen : AppTheme.lightGray;
-    final borderColor = isRecommended ? AppTheme.primaryGreen : Colors.orange;
+    final statusColor = isRecommended ? AppTheme.primaryGreen : Colors.orange;
+    final statusText = isRecommended ? 'Recommended' : 'Not Recommended';
+    final statusIcon = isRecommended ? Icons.check_circle : Icons.cancel;
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: cardColor.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor.withOpacity(0.3), width: 1.5),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: statusColor.withOpacity(0.2),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: borderColor.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: statusColor.withOpacity(0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
+          // Header with season name and status
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: borderColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: statusColor.withOpacity(0.05),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
             ),
-            child: Text(
-              icon,
-              style: const TextStyle(fontSize: 18),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  season.season,
-                  style: AppTheme.bodyLarge.copyWith(
-                    color: AppTheme.textDark,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    statusIcon,
+                    color: statusColor,
+                    size: 32,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'Success %: ${season.suitabilityScore}',
-                            style: AppTheme.bodyMedium.copyWith(
-                              color: AppTheme.darkGray,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        season.season,
+                        style: AppTheme.bodyLarge.copyWith(
+                          color: AppTheme.textDark,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
                         ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            'Yield: ${season.expectedYield}',
-                            style: AppTheme.bodyMedium.copyWith(
-                              color: AppTheme.darkGray,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Profit: ${season.profitabilityRating}',
-                      style: AppTheme.bodyMedium.copyWith(
-                        color: AppTheme.darkGray,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                      const SizedBox(height: 6),
+                      Text(
+                        statusText,
+                        style: AppTheme.bodyMedium.copyWith(
+                          color: statusColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Details section
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                // Success percentage with progress indicator
+                _buildDetailRow(
+                  icon: Icons.analytics_outlined,
+                  label: 'Success Rate',
+                  value: '${season.suitabilityScore}%',
+                  color: statusColor,
+                  showProgress: true,
+                  progress: season.suitabilityScore / 100,
+                ),
+                const SizedBox(height: 20),
+                
+                // Yield information
+                _buildDetailRow(
+                  icon: Icons.agriculture_outlined,
+                  label: 'Expected Yield',
+                  value: season.expectedYield,
+                  color: AppTheme.darkGray,
+                ),
+                const SizedBox(height: 20),
+                
+                // Profitability
+                _buildDetailRow(
+                  icon: Icons.trending_up_outlined,
+                  label: 'Profitability',
+                  value: season.profitabilityRating,
+                  color: AppTheme.primaryGreen,
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    bool showProgress = false,
+    double? progress,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            color: color,
+            size: 28,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: AppTheme.bodyMedium.copyWith(
+                  color: AppTheme.darkGray,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      value,
+                      style: AppTheme.bodyMedium.copyWith(
+                        color: AppTheme.textDark,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  if (showProgress && progress != null)
+                    Container(
+                      width: 80,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: progress,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -976,23 +1103,32 @@ class AIAnalysisReportScreen extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: AppTheme.primaryGreen,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryGreen.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: const Icon(
                     Icons.eco,
                     color: AppTheme.white,
-                    size: 24,
+                    size: 28,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Text(
                     'Top 5 Alternative Crop Recommendations',
                     style: AppTheme.heading3.copyWith(
                       color: AppTheme.textDark,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
@@ -1011,8 +1147,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
   }
 
   Widget _buildModernAlternativeCropCard(int rank, crop) {
-    final isHighSuccess = crop.suitabilityScore >= 80;
-    final cardColor = isHighSuccess ? AppTheme.accentGreen : AppTheme.primaryGreen;
+    final cardColor = AppTheme.primaryGreen;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1020,14 +1155,14 @@ class AIAnalysisReportScreen extends StatelessWidget {
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: cardColor,
-          width: 2,
+          color: cardColor.withOpacity(0.2),
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: cardColor.withOpacity(0.2),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -1048,6 +1183,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
                   '$rank',
                   style: AppTheme.bodyMedium.copyWith(
                     color: AppTheme.white,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -1063,39 +1199,33 @@ class AIAnalysisReportScreen extends StatelessWidget {
                     crop.name,
                     style: AppTheme.bodyLarge.copyWith(
                       color: AppTheme.textDark,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: cardColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${crop.suitabilityScore}% Success',
-                          style: AppTheme.bodySmall.copyWith(
-                            color: cardColor,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      Icon(
+                        Icons.analytics_outlined,
+                        color: cardColor,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Success Rate: ',
+                        style: AppTheme.bodyMedium.copyWith(
+                          color: AppTheme.darkGray,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryGreen.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          crop.expectedProfit,
-                          style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.primaryGreen,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      Text(
+                        '${crop.suitabilityScore}%',
+                        style: AppTheme.bodyMedium.copyWith(
+                          color: cardColor,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
@@ -1103,15 +1233,10 @@ class AIAnalysisReportScreen extends StatelessWidget {
                 ],
               ),
             ),
-            // Success indicator
-            Icon(
-              isHighSuccess ? Icons.star : Icons.star_border,
-              color: cardColor,
-              size: 20,
-            ),
           ],
         ),
       ),
     );
   }
 }
+
