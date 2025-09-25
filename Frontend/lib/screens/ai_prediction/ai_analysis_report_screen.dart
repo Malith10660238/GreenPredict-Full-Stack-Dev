@@ -193,7 +193,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
               
               // Content
               SliverPadding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     // Current Season Recommendation (with success rate circle)
@@ -201,7 +201,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
                       print('🔵 Building Current Season Recommendation...');
                       final currentSeasonData = _getCurrentSeasonRecommendation(prediction);
                       print('🔵 Current Season Data: $currentSeasonData');
-                      return _buildCurrentSeasonRecommendation(currentSeasonData);
+                      return _buildCurrentSeasonRecommendation(currentSeasonData, prediction);
                     }(),
                     
                     const SizedBox(height: 20),
@@ -227,7 +227,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
                     const SizedBox(height: 20),
                     
                     // Best Upcoming Seasons
-                    _buildUpcomingSeasonsSection(_getUpcomingSeasons(prediction), _getCropName(prediction)),
+                    _buildUpcomingSeasonsSection(_getUpcomingSeasons(prediction), _getCropName(prediction), prediction),
                     
                     const SizedBox(height: 20),
                     
@@ -423,6 +423,8 @@ class AIAnalysisReportScreen extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
           ),
         ],
@@ -430,7 +432,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCurrentSeasonRecommendation(recommendation) {
+  Widget _buildCurrentSeasonRecommendation(recommendation, dynamic prediction) {
     print('🔵 _buildCurrentSeasonRecommendation: recommendation = $recommendation');
     
     if (recommendation == null) {
@@ -440,12 +442,16 @@ class AIAnalysisReportScreen extends StatelessWidget {
     
     // Handle both object and map formats
     final suitabilityScore = recommendation is Map<String, dynamic> 
-        ? _safeToDouble(recommendation['suitabilityScore'])
+        ? _safeToDouble(recommendation['suitability_score'] ?? recommendation['suitabilityScore'])
         : _safeToDouble(recommendation.suitabilityScore);
+    
+    print('🔵 _buildCurrentSeasonRecommendation: suitabilityScore = $suitabilityScore');
     
     final isRecommended = suitabilityScore >= 50;
     final decisionColor = isRecommended ? AppTheme.accentGreen : Colors.red;
     final decisionText = isRecommended ? 'RECOMMENDED' : 'NOT RECOMMENDED';
+    
+    print('🔵 _buildCurrentSeasonRecommendation: isRecommended = $isRecommended, decisionText = $decisionText');
     
     return Card(
       elevation: 8,
@@ -552,8 +558,8 @@ class AIAnalysisReportScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   _buildInsightItem('Expected Yield', _getRecommendationReason(recommendation)),
-                  _buildInsightItem('Confidence Level', 'High'),
-                  _buildInsightItem('Risk Assessment', isRecommended ? 'Low Risk' : 'High Risk'),
+                  _buildInsightItem('Confidence Level', _getConfidenceLevel(prediction)),
+                  _buildInsightItem('Risk Assessment', _getRiskAssessmentLevel(prediction)),
                 ],
               ),
             ),
@@ -564,8 +570,13 @@ class AIAnalysisReportScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildInfoChip('Confidence Level', 'High', Icons.verified),
-                _buildInfoChip('Range', '${suitabilityScore.round()}%', Icons.trending_up),
+                Expanded(
+                  child: _buildInfoChip('Confidence Level', _getConfidenceLevel(prediction), Icons.verified),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildInfoChip('Range', '${suitabilityScore.round()}%', Icons.trending_up),
+                ),
               ],
             ),
             
@@ -736,12 +747,16 @@ class AIAnalysisReportScreen extends StatelessWidget {
         children: [
           Icon(icon, color: Colors.white, size: 16),
           const SizedBox(width: 6),
-          Text(
-            '$label: $value',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              '$label: $value',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
         ],
@@ -772,6 +787,8 @@ class AIAnalysisReportScreen extends StatelessWidget {
                 color: AppTheme.textDark,
                 fontWeight: FontWeight.w600,
               ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
           ),
         ],
@@ -792,7 +809,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
   }
 
 
-  Widget _buildUpcomingSeasonsSection(List<dynamic> seasons, String cropName) {
+  Widget _buildUpcomingSeasonsSection(List<dynamic> seasons, String cropName, dynamic prediction) {
     return Card(
       elevation: 8,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -861,7 +878,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            ...seasons.map((season) => _buildSeasonCard(season)),
+            ...seasons.map((season) => _buildSeasonCard(season, prediction)),
           ],
         ),
       ),
@@ -869,8 +886,11 @@ class AIAnalysisReportScreen extends StatelessWidget {
   }
 
 
-  Widget _buildSeasonCard(season) {
+  Widget _buildSeasonCard(season, dynamic prediction) {
     if (season == null) return const SizedBox.shrink();
+    
+    // Get planning year from prediction data
+    int planningYear = _getPlanningYear(prediction);
     
     // Helper function to get value from either Map or Object
     String getSeasonValue(String key) {
@@ -892,6 +912,34 @@ class AIAnalysisReportScreen extends StatelessWidget {
           return 'N/A';
         }
       }
+    }
+    
+    // Helper function to get dynamic year based on season index
+    String getDynamicYear() {
+      final fullSeasonName = getSeasonValue('season');
+      print('🔵 getDynamicYear: fullSeasonName = $fullSeasonName, planningYear = $planningYear');
+      
+      // Extract just the season name (before any year or space)
+      String seasonName = fullSeasonName;
+      if (fullSeasonName.contains(' ')) {
+        seasonName = fullSeasonName.split(' ')[0];
+      }
+      print('🔵 getDynamicYear: extracted seasonName = $seasonName');
+      
+      // Define seasons in order (Yala, Maha)
+      final seasons = ['Yala', 'Maha'];
+      final seasonIndex = seasons.indexOf(seasonName);
+      print('🔵 getDynamicYear: seasonIndex = $seasonIndex');
+      
+      if (seasonIndex >= 0) {
+        // Calculate year based on planning year + 1 (next year only, same for all seasons)
+        final dynamicYear = planningYear + 1;
+        print('🔵 getDynamicYear: calculated year = $dynamicYear');
+        return dynamicYear.toString();
+      }
+      final fallbackYear = planningYear + 1;
+      print('🔵 getDynamicYear: fallback year = $fallbackYear');
+      return fallbackYear.toString();
     }
     
     // Handle both object and map formats
@@ -953,7 +1001,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        getSeasonValue('season'),
+                        '${getSeasonValue('season').split(' ')[0]} ${getDynamicYear()}',
                         style: AppTheme.bodyLarge.copyWith(
                           color: AppTheme.textDark,
                           fontSize: 24,
@@ -1711,13 +1759,30 @@ class AIAnalysisReportScreen extends StatelessWidget {
         // Fallback: create a mock current season from available data
         final cropType = prediction['cropType'] ?? 'Unknown Crop';
         final confidence = _safeToDouble(prediction['confidence']);
+        
+        // Try to extract success probability from reasons if available
+        int suitabilityScore = (confidence * 100).round();
+        if (aiAnalysis['current_season'] != null && aiAnalysis['current_season']['reasons'] != null) {
+          final reasons = aiAnalysis['current_season']['reasons'] as List;
+          for (final reason in reasons) {
+            final reasonStr = reason.toString();
+            if (reasonStr.contains('Success probability:')) {
+              final match = RegExp(r'(\d+\.?\d*)%').firstMatch(reasonStr);
+              if (match != null) {
+                suitabilityScore = double.tryParse(match.group(1) ?? '0')?.round() ?? suitabilityScore;
+                break;
+              }
+            }
+          }
+        }
+        
         final result = {
-          'suitabilityScore': (confidence * 100).round(),
+          'suitabilityScore': suitabilityScore,
           'reasons': ['Based on historical prediction data'],
           'season': 'Current Season',
           'cropType': cropType,
         };
-        print('🔵 _getCurrentSeasonRecommendation: Created fallback result = $result');
+        print('🔵 _getCurrentSeasonRecommendation: Created fallback result with suitabilityScore = $suitabilityScore');
         return result;
       }
     }
@@ -1749,7 +1814,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
       
       // If not found, construct from root level data
       final result = {
-        'planning_year': prediction['planning_year'] ?? '2025',
+        'planning_year': prediction['planning_year'] ?? DateTime.now().year.toString(),
         'location': prediction['location'] ?? 'Unknown',
         'soil_type': prediction['soil_type'] ?? 'Unknown',
         'season': prediction['season'] ?? 'Unknown',
@@ -1880,6 +1945,138 @@ class AIAnalysisReportScreen extends StatelessWidget {
     } catch (e) {
       return [];
     }
+  }
+
+  // Helper method to extract confidence level from prediction data
+  String _getConfidenceLevel(dynamic prediction) {
+    if (prediction == null) return 'Unknown';
+    
+    // Check if it's from prediction history (Map format)
+    if (prediction is Map<String, dynamic>) {
+      final confidence = prediction['confidence'];
+      if (confidence != null) {
+        final confidenceValue = double.tryParse(confidence.toString()) ?? 0.0;
+        if (confidenceValue >= 0.8) return 'High';
+        if (confidenceValue >= 0.6) return 'Medium';
+        if (confidenceValue >= 0.4) return 'Low';
+        return 'Very Low';
+      }
+      
+      // Try to get from ai_analysis
+      final aiAnalysis = prediction['ai_analysis'];
+      if (aiAnalysis != null && aiAnalysis['current_season'] != null) {
+        final currentSeason = aiAnalysis['current_season'];
+        if (currentSeason['reasons'] != null && currentSeason['reasons'] is List) {
+          final reasons = currentSeason['reasons'] as List;
+          for (final reason in reasons) {
+            final reasonStr = reason.toString();
+            if (reasonStr.contains('Confidence level:')) {
+              final match = RegExp(r'Confidence level:\s*(\w+)', caseSensitive: false).firstMatch(reasonStr);
+              if (match != null) {
+                return match.group(1) ?? 'Unknown';
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Check if it's from provider (object format)
+    try {
+      final confidence = prediction.confidence;
+      if (confidence != null) {
+        final confidenceValue = double.tryParse(confidence.toString()) ?? 0.0;
+        if (confidenceValue >= 0.8) return 'High';
+        if (confidenceValue >= 0.6) return 'Medium';
+        if (confidenceValue >= 0.4) return 'Low';
+        return 'Very Low';
+      }
+    } catch (e) {
+      // Fallback if confidence property doesn't exist
+    }
+    
+    return 'Unknown';
+  }
+
+  // Helper method to extract risk assessment level from prediction data
+  String _getRiskAssessmentLevel(dynamic prediction) {
+    if (prediction == null) return 'Unknown';
+    
+    // Check if it's from prediction history (Map format)
+    if (prediction is Map<String, dynamic>) {
+      final aiAnalysis = prediction['ai_analysis'];
+      if (aiAnalysis != null && aiAnalysis['risk_assessment'] != null) {
+        final riskAssessment = aiAnalysis['risk_assessment'];
+        final overallRisk = riskAssessment['overall_risk'];
+        if (overallRisk != null) {
+          return overallRisk.toString();
+        }
+      }
+    }
+    
+    // Check if it's from provider (object format)
+    try {
+      final riskAssessment = prediction.riskAssessment;
+      if (riskAssessment != null) {
+        return riskAssessment.overallRisk?.toString() ?? 'Unknown';
+      }
+    } catch (e) {
+      // Fallback if riskAssessment property doesn't exist
+    }
+    
+    return 'Unknown';
+  }
+
+  // Helper method to extract planning year from prediction data
+  int _getPlanningYear(dynamic prediction) {
+    print('🔵 _getPlanningYear: prediction = $prediction');
+    
+    if (prediction == null) {
+      print('🔵 _getPlanningYear: prediction is null, using current year');
+      return DateTime.now().year;
+    }
+    
+    // Check if it's from prediction history (Map format)
+    if (prediction is Map<String, dynamic>) {
+      print('🔵 _getPlanningYear: prediction is Map format');
+      final aiAnalysis = prediction['ai_analysis'];
+      if (aiAnalysis != null && aiAnalysis['input_parameters'] != null) {
+        final inputParams = aiAnalysis['input_parameters'];
+        final planningYear = inputParams['planning_year'];
+        print('🔵 _getPlanningYear: found planning_year in input_parameters = $planningYear');
+        if (planningYear != null) {
+          final year = int.tryParse(planningYear.toString()) ?? DateTime.now().year;
+          print('🔵 _getPlanningYear: parsed year = $year');
+          return year;
+        }
+      }
+      
+      // Fallback to root level planning_year
+      final planningYear = prediction['planning_year'];
+      print('🔵 _getPlanningYear: root level planning_year = $planningYear');
+      if (planningYear != null) {
+        final year = int.tryParse(planningYear.toString()) ?? DateTime.now().year;
+        print('🔵 _getPlanningYear: parsed root year = $year');
+        return year;
+      }
+    }
+    
+    // Check if it's from provider (object format)
+    try {
+      final planningYear = prediction.inputParameters?.planningYear;
+      print('🔵 _getPlanningYear: provider planningYear = $planningYear');
+      if (planningYear != null) {
+        final year = int.tryParse(planningYear.toString()) ?? DateTime.now().year;
+        print('🔵 _getPlanningYear: parsed provider year = $year');
+        return year;
+      }
+    } catch (e) {
+      print('🔵 _getPlanningYear: error accessing inputParameters: $e');
+    }
+    
+    // Default to current year if not found
+    print('🔵 _getPlanningYear: using current year as fallback');
+    return DateTime.now().year;
   }
 }
 
