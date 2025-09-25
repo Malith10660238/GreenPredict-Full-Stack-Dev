@@ -11,7 +11,6 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../models/inquiry.dart';
 import '../../utils/app_theme.dart';
-import '../../utils/date_utils.dart' as app_date;
 
 class InquiryChatScreen extends StatefulWidget {
   final Inquiry inquiry;
@@ -300,51 +299,46 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
 
     return Column(
       children: [
-        // Initial inquiry message
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.primaryGreen.withOpacity(0.1),
-            border: Border(
-              left: BorderSide(color: AppTheme.primaryGreen, width: 4),
+        // WhatsApp-like centered message
+        Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: AppTheme.primaryGreen,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Initial Inquiry',
-                    style: AppTheme.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.primaryGreen,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.chat_bubble_outline,
+                      color: Colors.grey[600],
+                      size: 16,
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                widget.inquiry.message,
-                style: AppTheme.bodyMedium.copyWith(
-                  color: Colors.grey[800],
+                    const SizedBox(width: 8),
+                    Text(
+                      'Conversation started',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                app_date.AppDateUtils.getRelativeTime(widget.inquiry.createdAt.toIso8601String()),
-                style: AppTheme.bodySmall.copyWith(
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         
@@ -1125,6 +1119,7 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
       ),
     );
   }
+
 
 }
 

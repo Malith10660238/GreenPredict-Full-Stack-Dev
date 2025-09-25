@@ -1171,32 +1171,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           animation: _floatAnimation,
           builder: (context, child) {
             final floatOffset = (index % 2 == 0 ? 1 : -1) * 
-                (0.5 + 0.3 * _floatAnimation.value);
+                (0.5 + 0.3 * _floatAnimation.value.clamp(0.0, 1.0));
             return Transform.translate(
               offset: Offset(0, floatOffset),
               child: Transform.scale(
                 scale: value,
                 child: Opacity(
-                  opacity: value,
+                  opacity: value.clamp(0.0, 1.0),
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: color.withOpacity(0.15),
+                          color: color.withOpacity(0.15.clamp(0.0, 1.0)),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                           spreadRadius: 0,
                         ),
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withOpacity(0.05.clamp(0.0, 1.0)),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
                       ],
                       border: Border.all(
-                        color: color.withOpacity(0.1),
+                        color: color.withOpacity(0.1.clamp(0.0, 1.0)),
                         width: 1,
                       ),
                     ),

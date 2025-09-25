@@ -24,13 +24,22 @@ class ProfileStatsCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.white,
+          color: Colors.white.withOpacity(0.7),
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppTheme.primaryGreen.withOpacity(0.2),
+            width: 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: AppTheme.primaryGreen.withOpacity(0.15),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+            BoxShadow(
+              color: Colors.white.withOpacity(0.9),
+              blurRadius: 6,
+              offset: const Offset(0, -2),
             ),
           ],
         ),
@@ -94,13 +103,22 @@ class ProfileInfoCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppTheme.white,
+        color: Colors.white.withOpacity(0.7),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.primaryGreen.withOpacity(0.2),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: AppTheme.primaryGreen.withOpacity(0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+          BoxShadow(
+            color: Colors.white.withOpacity(0.9),
+            blurRadius: 6,
+            offset: const Offset(0, -2),
           ),
         ],
       ),
@@ -310,13 +328,22 @@ class ProfileBioCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.white,
+        color: Colors.white.withOpacity(0.7),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.primaryGreen.withOpacity(0.2),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: AppTheme.primaryGreen.withOpacity(0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+          BoxShadow(
+            color: Colors.white.withOpacity(0.9),
+            blurRadius: 6,
+            offset: const Offset(0, -2),
           ),
         ],
       ),

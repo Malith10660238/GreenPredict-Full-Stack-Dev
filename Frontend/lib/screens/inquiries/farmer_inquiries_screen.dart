@@ -4,7 +4,6 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../models/inquiry.dart';
 import '../../utils/app_theme.dart';
-import '../../utils/date_utils.dart' as app_date;
 import 'inquiry_chat_screen.dart';
 import 'hidden_chats_screen.dart';
 
@@ -60,8 +59,21 @@ class _FarmerInquiriesScreenState extends State<FarmerInquiriesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
+      body: Container(
+        decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.primaryGreen.withOpacity(0.2),
+                  AppTheme.primaryGreen.withOpacity(0.1),
+                  Colors.white,
+                ],
+              ),
+        ),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
         title: const Text('Inquiries'),
         backgroundColor: AppTheme.primaryGreen,
         foregroundColor: Colors.white,
@@ -111,6 +123,8 @@ class _FarmerInquiriesScreenState extends State<FarmerInquiriesScreen> {
         ],
       ),
       body: _buildBody(),
+        ),
+      ),
     );
   }
 
@@ -209,142 +223,109 @@ class _FarmerInquiriesScreenState extends State<FarmerInquiriesScreen> {
   }
 
   Widget _buildInquiryCard(Inquiry inquiry) {
-    final statusColor = _getStatusColor(inquiry.status);
-    final statusText = _getStatusText(inquiry.status);
-    
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.7),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.primaryGreen.withOpacity(0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryGreen.withOpacity(0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+          BoxShadow(
+            color: Colors.white.withOpacity(0.9),
+            blurRadius: 6,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
-      child: InkWell(
-        onTap: () => _openInquiryChat(inquiry),
-        onLongPress: () => _showInquiryOptions(inquiry),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: AppTheme.primaryGreen.withOpacity(0.1),
-                    child: Icon(
-                      Icons.person,
-                      color: AppTheme.primaryGreen,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openInquiryChat(inquiry),
+          onLongPress: () => _showInquiryOptions(inquiry),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: AppTheme.primaryGreen.withOpacity(0.1),
+                      child: Icon(
+                        Icons.person,
+                        color: AppTheme.primaryGreen,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          inquiry.consumerName ?? 'Customer',
-                          style: AppTheme.bodyLarge.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (inquiry.productName != null)
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
                           Text(
-                            'About: ${inquiry.productName}',
-                            style: AppTheme.bodySmall.copyWith(
-                              color: Colors.grey[600],
+                            inquiry.consumerName ?? 'Customer',
+                            style: AppTheme.bodyLarge.copyWith(
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      statusText,
-                      style: AppTheme.bodySmall.copyWith(
-                        color: statusColor,
-                        fontWeight: FontWeight.w500,
+                          if (inquiry.productName != null)
+                            Text(
+                              'About: ${inquiry.productName}',
+                              style: AppTheme.bodySmall.copyWith(
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                inquiry.message,
-                style: AppTheme.bodyMedium,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(
-                    Icons.access_time,
-                    size: 16,
-                    color: Colors.grey[500],
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    app_date.AppDateUtils.getRelativeTime(inquiry.createdAt.toIso8601String()),
-                    style: AppTheme.bodySmall.copyWith(
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                  const Spacer(),
-                  if (inquiry.messages.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryGreen,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${inquiry.messages.length} messages',
-                        style: AppTheme.bodySmall.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  inquiry.message,
+                  style: AppTheme.bodyMedium,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Spacer(),
+                    if (inquiry.messages.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryGreen,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${inquiry.messages.length} messages',
+                          style: AppTheme.bodySmall.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Colors.orange;
-      case 'replied':
-        return AppTheme.primaryGreen;
-      case 'closed':
-        return Colors.grey;
-      default:
-        return Colors.blue;
-    }
-  }
-
-  String _getStatusText(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return 'Pending';
-      case 'replied':
-        return 'Replied';
-      case 'closed':
-        return 'Closed';
-      default:
-        return status;
-    }
-  }
 
   void _openInquiryChat(Inquiry inquiry) {
     Navigator.push(
@@ -403,167 +384,8 @@ class _FarmerInquiriesScreenState extends State<FarmerInquiriesScreen> {
     );
   }
 
-  void _showFilterDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Filter Inquiries'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.pending),
-              title: const Text('Pending'),
-              onTap: () {
-                Navigator.pop(context);
-                _filterByStatus('pending');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.reply),
-              title: const Text('Replied'),
-              onTap: () {
-                Navigator.pop(context);
-                _filterByStatus('replied');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.close),
-              title: const Text('Closed'),
-              onTap: () {
-                Navigator.pop(context);
-                _filterByStatus('closed');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.clear),
-              title: const Text('Clear Filter'),
-              onTap: () {
-                Navigator.pop(context);
-                _clearFilter();
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
 
-  void _filterByStatus(String status) {
-    // TODO: Implement filtering logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Filtering by $status (Feature coming soon)'),
-        backgroundColor: AppTheme.primaryGreen,
-      ),
-    );
-  }
 
-  void _clearFilter() {
-    // TODO: Implement clear filter logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Filter cleared'),
-        backgroundColor: AppTheme.primaryGreen,
-      ),
-    );
-  }
-
-  void _handleMenuAction(String action) {
-    switch (action) {
-      case 'mark_all_replied':
-        _markAllAsReplied();
-        break;
-      case 'close_all':
-        _closeAllInquiries();
-        break;
-      case 'export':
-        _exportInquiries();
-        break;
-    }
-  }
-
-  void _markAllAsReplied() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Mark All as Replied'),
-        content: const Text('Are you sure you want to mark all inquiries as replied?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Implement mark all as replied
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('All inquiries marked as replied (Feature coming soon)'),
-                  backgroundColor: AppTheme.primaryGreen,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryGreen,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Mark All'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _closeAllInquiries() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Close All Inquiries'),
-        content: const Text('Are you sure you want to close all inquiries? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Implement close all inquiries
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('All inquiries closed (Feature coming soon)'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Close All'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _exportInquiries() {
-    // TODO: Implement export functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Exporting inquiries... (Feature coming soon)'),
-        backgroundColor: AppTheme.primaryGreen,
-      ),
-    );
-  }
 
   void _showInquiryOptions(Inquiry inquiry) {
     showModalBottomSheet(
@@ -711,7 +533,7 @@ class _FarmerInquiriesScreenState extends State<FarmerInquiriesScreen> {
             _buildDetailRow('Customer', inquiry.consumerName ?? 'Unknown'),
             _buildDetailRow('Product', inquiry.productName ?? 'Unknown'),
             _buildDetailRow('Status', inquiry.status.toUpperCase()),
-            _buildDetailRow('Created', app_date.AppDateUtils.getRelativeTime(inquiry.createdAt.toIso8601String())),
+            _buildDetailRow('Created', 'Recently'),
             _buildDetailRow('Messages', '${inquiry.messages.length} messages'),
           ],
         ),

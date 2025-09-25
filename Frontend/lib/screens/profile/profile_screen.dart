@@ -71,8 +71,19 @@ class _ProfileScreenState extends State<ProfileScreen>
         print('🔵 Profile screen rebuild - Bio: ${authProvider.user?.bio}');
         
         return Scaffold(
-          backgroundColor: AppTheme.lightGray,
-          body: CustomScrollView(
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.primaryGreen.withOpacity(0.2),
+                  AppTheme.primaryGreen.withOpacity(0.1),
+                  Colors.white,
+                ],
+              ),
+            ),
+            child: CustomScrollView(
             slivers: [
               _buildSliverAppBar(authProvider),
               SliverToBoxAdapter(
@@ -116,6 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             ],
           ),
+            ),
         );
       },
     );
