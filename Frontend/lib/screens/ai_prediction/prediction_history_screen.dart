@@ -344,15 +344,37 @@ class _PredictionHistoryScreenState extends State<PredictionHistoryScreen> {
     // Handle createdAt field - it might be a String or DateTime
     DateTime? createdAt;
     final createdAtValue = prediction['createdAt'];
+    print('🔵 Raw createdAt value: $createdAtValue (type: ${createdAtValue.runtimeType})');
+    
     if (createdAtValue is DateTime) {
       createdAt = createdAtValue;
+      print('🔵 Parsed as DateTime: $createdAt');
     } else if (createdAtValue is String) {
       try {
         createdAt = DateTime.parse(createdAtValue);
+        print('🔵 Parsed string to DateTime: $createdAt');
       } catch (e) {
         print('⚠️ Failed to parse createdAt: $createdAtValue, error: $e');
         createdAt = null;
       }
+    } else {
+      print('⚠️ Unknown createdAt type: ${createdAtValue.runtimeType}');
+      createdAt = null;
+    }
+    
+    // Debug: Show the final formatted date
+    if (createdAt != null) {
+      final formatted = _formatDate(createdAt);
+      final now = DateTime.now();
+      final nowUtc = now.toUtc();
+      final dateUtc = createdAt.toUtc();
+      final difference = nowUtc.difference(dateUtc);
+      print('🔵 Formatted date: $formatted');
+      print('🔵 Time difference (UTC): ${difference.inSeconds} seconds, ${difference.inMinutes} minutes, ${difference.inHours} hours, ${difference.inDays} days');
+      print('🔵 Current time (local): $now');
+      print('🔵 Current time (UTC): $nowUtc');
+      print('🔵 Created time (local): $createdAt');
+      print('🔵 Created time (UTC): $dateUtc');
     }
     
     final cropType = prediction['cropType'] ?? 'Unknown Crop';
@@ -460,18 +482,22 @@ class _PredictionHistoryScreenState extends State<PredictionHistoryScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () => _showDeleteDialog(prediction),
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
-                              size: 20,
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => _showDeleteDialog(prediction),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.red,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ),
@@ -545,20 +571,52 @@ class _PredictionHistoryScreenState extends State<PredictionHistoryScreen> {
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
-    final difference = now.difference(date);
+    // Handle timezone differences - convert both to UTC for comparison
+    final nowUtc = now.toUtc();
+    final dateUtc = date.toUtc();
+    final difference = nowUtc.difference(dateUtc);
     
-    if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
+    // More than 1 year ago
+    if (difference.inDays >= 365) {
+      final years = (difference.inDays / 365).floor();
+      return years == 1 ? '1 year ago' : '$years years ago';
+    }
+    // More than 1 month ago
+    else if (difference.inDays >= 30) {
+      final months = (difference.inDays / 30).floor();
+      return months == 1 ? '1 month ago' : '$months months ago';
+    }
+    // More than 1 week ago
+    else if (difference.inDays >= 7) {
+      final weeks = (difference.inDays / 7).floor();
+      return weeks == 1 ? '1 week ago' : '$weeks weeks ago';
+    }
+    // More than 1 day ago
+    else if (difference.inDays > 0) {
+      return difference.inDays == 1 ? '1 day ago' : '${difference.inDays} days ago';
+    }
+    // More than 1 hour ago
+    else if (difference.inHours > 0) {
+      return difference.inHours == 1 ? '1 hour ago' : '${difference.inHours} hours ago';
+    }
+    // More than 1 minute ago
+    else if (difference.inMinutes > 0) {
+      return difference.inMinutes == 1 ? '1 minute ago' : '${difference.inMinutes} minutes ago';
+    }
+    // Less than 1 minute ago
+    else if (difference.inSeconds > 30) {
+      return '${difference.inSeconds} seconds ago';
+    }
+    // Very recent (less than 30 seconds)
+    else {
       return 'Just now';
     }
   }
 
   void _navigateToPredictionDetail(Map<String, dynamic> prediction) {
+    print('🔵 Navigation: Tapped on prediction: ${prediction['cropType']}');
+    print('🔵 Navigation: Prediction data: $prediction');
+    
     Navigator.push(
       context,
       MaterialPageRoute(

@@ -111,6 +111,9 @@ async def analyze_crop_prediction(
         prediction_result = generate_ai_prediction(input_params)
         
         # Save prediction to Firestore in crop_predictions_ai collection
+        from datetime import timezone
+        current_time = datetime.now(timezone.utc)
+        print(f"🔵 Backend: Setting createdAt to: {current_time}")
         prediction_doc = {
             'prediction_id': prediction_id,
             'user_id': current_user['uid'],
@@ -118,7 +121,7 @@ async def analyze_crop_prediction(
             'location': input_params.location,
             'predictedYield': prediction_result.yield_profitability_analysis.expected_yield,
             'confidence': prediction_result.current_season_recommendation.suitability_score / 100,
-            'createdAt': datetime.now(),
+            'createdAt': current_time,
             'input_parameters': input_params.dict(),
             'ai_analysis': {
                 'input_parameters': {
@@ -217,16 +220,22 @@ async def get_prediction_history(
             pred_data = pred.to_dict()
             # Convert Firestore timestamp to ISO string format
             created_at = pred_data.get('createdAt')
+            print(f"🔵 Backend: Raw createdAt from Firestore: {created_at} (type: {type(created_at)})")
+            
             if hasattr(created_at, 'timestamp'):
                 created_at = datetime.fromtimestamp(created_at.timestamp()).isoformat()
+                print(f"🔵 Backend: Converted Firestore timestamp to: {created_at}")
             elif isinstance(created_at, datetime):
                 created_at = created_at.isoformat()
+                print(f"🔵 Backend: Converted datetime to ISO: {created_at}")
             elif isinstance(created_at, str):
                 # If it's already a string, keep it as is
+                print(f"🔵 Backend: Already a string: {created_at}")
                 pass
             else:
                 # Convert to ISO string format
                 created_at = created_at.isoformat() if created_at else None
+                print(f"🔵 Backend: Converted other type to ISO: {created_at}")
             
             prediction_history.append({
                 'prediction_id': pred_data.get('prediction_id'),
