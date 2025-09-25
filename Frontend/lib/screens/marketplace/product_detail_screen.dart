@@ -5,6 +5,9 @@ import '../../providers/auth_provider.dart';
 import '../../providers/listing_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/date_utils.dart' as app_date;
+import '../../services/api_service.dart';
+import '../../models/inquiry.dart';
+import '../inquiries/inquiry_chat_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Map<String, dynamic> listing;
@@ -22,6 +25,7 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final PageController _imageController = PageController();
+  final ApiService _apiService = ApiService();
   int _currentImageIndex = 0;
 
   // TODO: Fetch real farmer's other products from API
@@ -691,43 +695,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 20),
       child: ElevatedButton(
-        onPressed: () {
-          final authProvider = Provider.of<AuthProvider>(context, listen: false);
-          
-          if (!authProvider.isAuthenticated) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Please log in to chat with the farmer.'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-            return;
-          }
-
-          // For now, just show a message since ChatScreen might not be fully implemented
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Chat with ${widget.listing['farmerName'] ?? 'Farmer'} - Feature coming soon!',
-              ),
-              backgroundColor: AppTheme.primaryGreen,
-            ),
-          );
-          
-          // Uncomment this when ChatScreen is ready:
-          // final farmerId = widget.listing['farmerId']?.toString() ?? 'unknown_farmer_id';
-          // final farmerName = widget.listing['farmerName']?.toString() ?? 'Farmer';
-          // 
-          // Navigator.push(
-          //   context,
-          //   MaterialPageRoute(
-          //     builder: (context) => ChatScreen(
-          //       receiverId: farmerId,
-          //       receiverName: farmerName,
-          //     ),
-          //   ),
-          // );
-        },
+        onPressed: () => _handleChatWithFarmer(context),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppTheme.primaryGreen,
           foregroundColor: Colors.white,
@@ -753,5 +721,187 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleChatWithFarmer(BuildContext context) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    if (!authProvider.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to chat with the farmer.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Check if user is a farmer (farmers can't chat with other farmers)
+    if (authProvider.isFarmer) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Farmers can only reply to inquiries from customers.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Show inquiry dialog
+    _showInquiryDialog(context);
+  }
+
+  void _showInquiryDialog(BuildContext context) {
+    final TextEditingController messageController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.chat_bubble_outline, color: AppTheme.primaryGreen),
+            const SizedBox(width: 8),
+            const Text('Send Inquiry'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Send a message to ${widget.listing['farmerName'] ?? 'the farmer'} about this product:',
+              style: AppTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              widget.listing['title'] ?? 'Product',
+              style: AppTheme.bodyLarge.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryGreen,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: messageController,
+              decoration: InputDecoration(
+                hintText: 'Type your message here...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: AppTheme.primaryGreen),
+                ),
+              ),
+              maxLines: 4,
+              maxLength: 500,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => _sendInquiry(context, messageController.text.trim()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryGreen,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _sendInquiry(BuildContext context, String message) async {
+    if (message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a message.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      Navigator.pop(context); // Close dialog
+      
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+          ),
+        ),
+      );
+
+      final farmerId = widget.listing['farmerId']?.toString();
+      final productId = widget.listing['id']?.toString();
+      
+      if (farmerId == null || productId == null) {
+        throw Exception('Missing farmer or product information');
+      }
+
+      print('🔵 Creating inquiry for farmer: $farmerId, product: $productId');
+      
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.authToken == null) {
+        throw Exception('No authentication token available');
+      }
+
+      final inquiryData = await _apiService.createInquiry(
+        farmerId: farmerId,
+        productId: productId,
+        message: message,
+        token: authProvider.authToken!,
+      );
+
+      // Close loading dialog
+      Navigator.pop(context);
+
+      // Create inquiry object
+      final inquiry = Inquiry.fromJson(inquiryData);
+      
+      // Navigate to chat screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => InquiryChatScreen(
+            inquiry: inquiry,
+            isFarmer: false,
+            onInquiryUpdated: (updatedInquiry) {
+              // Handle inquiry updates if needed
+            },
+          ),
+        ),
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Inquiry sent successfully!'),
+          backgroundColor: AppTheme.primaryGreen,
+        ),
+      );
+
+    } catch (e) {
+      // Close loading dialog if still open
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      print('❌ Error sending inquiry: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send inquiry: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }

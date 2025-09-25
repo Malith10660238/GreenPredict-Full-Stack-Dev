@@ -9,6 +9,8 @@ import '../screens/notifications/notifications_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/ai_prediction/prediction_history_screen.dart';
+import '../screens/inquiries/farmer_inquiries_screen.dart';
+import '../screens/inquiries/consumer_messages_screen.dart';
 
 class CustomAppDrawer extends StatelessWidget {
   final Function(int) onNavigateToTab;
@@ -275,30 +277,39 @@ class CustomAppDrawer extends StatelessWidget {
             ),
           ],
 
-          // Common authenticated items
-          _buildDrawerItem(
-            context: context,
-            icon: Icons.chat_bubble_outline,
-            title: 'Messages',
-            onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Messages feature coming soon!')),
-              );
-            },
-          ),
+          // Farmer specific: Inquiries (received messages)
+          if (isFarmer)
+            _buildDrawerItem(
+              context: context,
+              icon: Icons.inbox_outlined,
+              title: 'Inquiries',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const FarmerInquiriesScreen(),
+                  ),
+                );
+              },
+            ),
 
-          _buildDrawerItem(
-            context: context,
-            icon: Icons.help_outline,
-            title: 'Inquiries',
-            onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Inquiries feature coming soon!')),
-              );
-            },
-          ),
+          // Consumer specific: Messages (sent messages)
+          if (!isFarmer)
+            _buildDrawerItem(
+              context: context,
+              icon: Icons.chat_bubble_outline,
+              title: 'Messages',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ConsumerMessagesScreen(),
+                  ),
+                );
+              },
+            ),
 
           _buildDrawerItem(
             context: context,

@@ -764,6 +764,404 @@ async def delete_listing(listing_id: str, current_user: dict = Depends(get_curre
             detail=f"Failed to delete listing: {str(e)}"
         )
 
+# ==================== INQUIRY ENDPOINTS ====================
+
+@app.get("/test-inquiries")
+async def test_inquiries():
+    """Test endpoint to verify server is working"""
+    return {"message": "Inquiry endpoints are available", "status": "working"}
+
+@app.post("/test-create-inquiry")
+async def test_create_inquiry(inquiry_data: dict, current_user: dict = Depends(get_current_user)):
+    """Test endpoint to create inquiry"""
+    print(f"🔵 TEST Inquiry endpoint hit! Data: {inquiry_data}")
+    print(f"🔵 TEST Current user: {current_user}")
+    return {"message": "Test inquiry created", "id": "test_123"}
+
+@app.post("/api/inquiries")
+async def create_inquiry(inquiry_data: dict, current_user: dict = Depends(get_current_user)):
+    """Create a new inquiry from consumer to farmer"""
+    print(f"🔵 Inquiry endpoint hit! Data: {inquiry_data}")
+    print(f"🔵 Current user: {current_user}")
+    try:
+        farmer_id = inquiry_data.get("farmerId")
+        product_id = inquiry_data.get("productId")
+        message = inquiry_data.get("message")
+        
+        if not farmer_id or not product_id or not message:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing required fields: farmerId, productId, message"
+            )
+        
+        # Get product details from listings collection
+        product_ref = db.collection("listings").document(product_id)
+        product_doc = product_ref.get()
+        
+        if not product_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Product not found"
+            )
+        
+        product_data = product_doc.to_dict()
+        
+        # Get farmer details
+        farmer_ref = db.collection("farmers").document(farmer_id)
+        farmer_doc = farmer_ref.get()
+        
+        if not farmer_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Farmer not found"
+            )
+        
+        farmer_data = farmer_doc.to_dict()
+        
+        # Create inquiry document
+        inquiry_data = {
+            "consumerId": current_user["uid"],
+            "farmerId": farmer_id,
+            "productId": product_id,
+            "productName": product_data.get("name", "Unknown Product"),
+            "farmerName": farmer_data.get("firstName", "") + " " + farmer_data.get("lastName", ""),
+            "consumerName": current_user.get("displayName", "Consumer"),
+            "status": "pending",
+            "createdAt": datetime.now(),
+            "updatedAt": datetime.now(),
+            "messages": [{
+                "senderId": current_user["uid"],
+                "message": message,
+                "timestamp": datetime.now()
+            }]
+        }
+        
+        # Save to Firestore
+        inquiry_ref = db.collection("inquiries").add(inquiry_data)
+        inquiry_id = inquiry_ref[1].id
+        
+        return {
+            "id": inquiry_id,
+            "message": "Inquiry created successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create inquiry: {str(e)}"
+        )
+
+@app.get("/api/inquiries/farmer")
+async def get_farmer_inquiries(current_user: dict = Depends(get_current_user)):
+    """Get all inquiries for a farmer"""
+    try:
+        inquiries_ref = db.collection("inquiries").where("farmerId", "==", current_user["uid"])
+        inquiries = inquiries_ref.stream()
+        
+        inquiry_list = []
+        for inquiry in inquiries:
+            inquiry_data = inquiry.to_dict()
+            inquiry_data["id"] = inquiry.id
+            inquiry_list.append(inquiry_data)
+        
+        return inquiry_list
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch inquiries: {str(e)}"
+        )
+
+@app.get("/api/inquiries/consumer")
+async def get_consumer_messages(current_user: dict = Depends(get_current_user)):
+    """Get all messages sent by a consumer"""
+    try:
+        inquiries_ref = db.collection("inquiries").where("consumerId", "==", current_user["uid"])
+        inquiries = inquiries_ref.stream()
+        
+        inquiry_list = []
+        for inquiry in inquiries:
+            inquiry_data = inquiry.to_dict()
+            inquiry_data["id"] = inquiry.id
+            inquiry_list.append(inquiry_data)
+        
+        return inquiry_list
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch messages: {str(e)}"
+        )
+
+@app.get("/api/inquiries/{inquiry_id}")
+async def get_inquiry_details(inquiry_id: str, current_user: dict = Depends(get_current_user)):
+    """Get specific inquiry details"""
+    try:
+        inquiry_ref = db.collection("inquiries").document(inquiry_id)
+        inquiry_doc = inquiry_ref.get()
+        
+        if not inquiry_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Inquiry not found"
+            )
+        
+        inquiry_data = inquiry_doc.to_dict()
+        
+        # Check if user has access to this inquiry
+        if (inquiry_data["consumerId"] != current_user["uid"] and 
+            inquiry_data["farmerId"] != current_user["uid"]):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied"
+            )
+        
+        inquiry_data["id"] = inquiry_id
+        return inquiry_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch inquiry: {str(e)}"
+        )
+
+@app.post("/api/inquiries/{inquiry_id}/messages")
+async def send_inquiry_message(inquiry_id: str, message_data: dict, current_user: dict = Depends(get_current_user)):
+    """Send a message in an inquiry"""
+    try:
+        message = message_data.get("message")
+        
+        if not message:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Message is required"
+            )
+        
+        inquiry_ref = db.collection("inquiries").document(inquiry_id)
+        inquiry_doc = inquiry_ref.get()
+        
+        if not inquiry_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Inquiry not found"
+            )
+        
+        inquiry_data = inquiry_doc.to_dict()
+        
+        # Check if user has access to this inquiry
+        if (inquiry_data["consumerId"] != current_user["uid"] and 
+            inquiry_data["farmerId"] != current_user["uid"]):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied"
+            )
+        
+        # Add new message with unique ID
+        import uuid
+        message_id = str(uuid.uuid4())
+        new_message = {
+            "messageId": message_id,
+            "senderId": current_user["uid"],
+            "message": message,
+            "timestamp": datetime.now()
+        }
+        
+        # Update inquiry with new message
+        inquiry_ref.update({
+            "messages": firestore.ArrayUnion([new_message]),
+            "updatedAt": datetime.now()
+        })
+        
+        return {
+            "message": "Message sent successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send message: {str(e)}"
+        )
+
+@app.put("/api/inquiries/{inquiry_id}/status")
+async def update_inquiry_status(inquiry_id: str, status_data: dict, current_user: dict = Depends(get_current_user)):
+    """Update inquiry status (farmer only)"""
+    try:
+        new_status = status_data.get("status")
+        
+        if not new_status:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Status is required"
+            )
+        
+        inquiry_ref = db.collection("inquiries").document(inquiry_id)
+        inquiry_doc = inquiry_ref.get()
+        
+        if not inquiry_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Inquiry not found"
+            )
+        
+        inquiry_data = inquiry_doc.to_dict()
+        
+        # Check if user is the farmer
+        if inquiry_data["farmerId"] != current_user["uid"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the farmer can update inquiry status"
+            )
+        
+        # Update status
+        inquiry_ref.update({
+            "status": new_status,
+            "updatedAt": datetime.now()
+        })
+        
+        return {
+            "message": "Inquiry status updated successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update inquiry status: {str(e)}"
+        )
+
+@app.put("/api/inquiries/{inquiry_id}/hide")
+async def hide_inquiry(inquiry_id: str, hide_data: dict, current_user: dict = Depends(get_current_user)):
+    """Hide/unhide an inquiry"""
+    try:
+        hidden = hide_data.get("hidden", True)
+        
+        inquiry_ref = db.collection("inquiries").document(inquiry_id)
+        inquiry_doc = inquiry_ref.get()
+        
+        if not inquiry_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Inquiry not found"
+            )
+        
+        inquiry_data = inquiry_doc.to_dict()
+        
+        # Check if user has access to this inquiry
+        if (inquiry_data["consumerId"] != current_user["uid"] and 
+            inquiry_data["farmerId"] != current_user["uid"]):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied"
+            )
+        
+        # Update hidden status
+        inquiry_ref.update({
+            "hidden": hidden,
+            "hiddenBy": current_user["uid"] if hidden else None,
+            "hiddenAt": datetime.now() if hidden else None,
+            "updatedAt": datetime.now()
+        })
+        
+        action = "hidden" if hidden else "unhidden"
+        return {
+            "message": f"Inquiry {action} successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to hide inquiry: {str(e)}"
+        )
+
+@app.get("/api/inquiries/hidden")
+async def get_hidden_inquiries(current_user: dict = Depends(get_current_user)):
+    """Get hidden inquiries for current user"""
+    try:
+        inquiries_ref = db.collection("inquiries").where("hidden", "==", True).where("hiddenBy", "==", current_user["uid"])
+        inquiries = inquiries_ref.stream()
+        
+        inquiry_list = []
+        for inquiry in inquiries:
+            inquiry_data = inquiry.to_dict()
+            inquiry_data["id"] = inquiry.id
+            inquiry_list.append(inquiry_data)
+        
+        return inquiry_list
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch hidden inquiries: {str(e)}"
+        )
+
+@app.delete("/api/inquiries/{inquiry_id}/messages/{message_id}")
+async def delete_message(inquiry_id: str, message_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a specific message (only own messages)"""
+    try:
+        inquiry_ref = db.collection("inquiries").document(inquiry_id)
+        inquiry_doc = inquiry_ref.get()
+        
+        if not inquiry_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Inquiry not found"
+            )
+        
+        inquiry_data = inquiry_doc.to_dict()
+        
+        # Check if user has access to this inquiry
+        if (inquiry_data["consumerId"] != current_user["uid"] and 
+            inquiry_data["farmerId"] != current_user["uid"]):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied"
+            )
+        
+        # Find and remove the message
+        messages = inquiry_data.get("messages", [])
+        message_found = False
+        
+        for i, message in enumerate(messages):
+            # Check if this is the message to delete and if it belongs to current user
+            if (message.get("senderId") == current_user["uid"] and 
+                message.get("messageId") == message_id):
+                messages.pop(i)
+                message_found = True
+                break
+        
+        if not message_found:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Message not found or you don't have permission to delete it"
+            )
+        
+        # Update the inquiry with modified messages
+        inquiry_ref.update({
+            "messages": messages,
+            "updatedAt": datetime.now()
+        })
+        
+        return {
+            "message": "Message deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete message: {str(e)}"
+        )
+
 if __name__ == "__main__":
     uvicorn.run(
         "main_firebase:app",

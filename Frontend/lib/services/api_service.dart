@@ -475,4 +475,273 @@ Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
     }
   }
 
+  // ==================== INQUIRY/CHAT METHODS ====================
+
+  /// Create a new inquiry from consumer to farmer
+  Future<Map<String, dynamic>> createInquiry({
+    required String farmerId,
+    required String productId,
+    required String message,
+    required String token,
+  }) async {
+    try {
+      print('🔵 Creating inquiry for farmer: $farmerId, product: $productId');
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/inquiries'),
+        headers: _authHeaders(token),
+        body: jsonEncode({
+          'farmerId': farmerId,
+          'productId': productId,
+          'message': message,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ Inquiry created successfully');
+        return jsonDecode(response.body);
+      } else {
+        print('❌ Failed to create inquiry: ${response.statusCode}');
+        throw Exception('Failed to create inquiry: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during create inquiry: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// Get inquiries for farmers (received messages)
+  Future<List<Map<String, dynamic>>> getFarmerInquiries(String token) async {
+    try {
+      print('🔵 Fetching farmer inquiries');
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/inquiries/farmer'),
+        headers: _authHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Farmer inquiries fetched successfully');
+        return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      } else {
+        print('❌ Failed to fetch farmer inquiries: ${response.statusCode}');
+        throw Exception('Failed to fetch farmer inquiries: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during fetch farmer inquiries: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// Get messages for consumers (sent messages)
+  Future<List<Map<String, dynamic>>> getConsumerMessages(String token) async {
+    try {
+      print('🔵 Fetching consumer messages');
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/inquiries/consumer'),
+        headers: _authHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Consumer messages fetched successfully');
+        return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      } else {
+        print('❌ Failed to fetch consumer messages: ${response.statusCode}');
+        throw Exception('Failed to fetch consumer messages: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during fetch consumer messages: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// Get inquiry details with messages
+  Future<Map<String, dynamic>> getInquiryDetails(String inquiryId, String token) async {
+    try {
+      print('🔵 Fetching inquiry details: $inquiryId');
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/inquiries/$inquiryId'),
+        headers: _authHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Inquiry details fetched successfully');
+        return jsonDecode(response.body);
+      } else {
+        print('❌ Failed to fetch inquiry details: ${response.statusCode}');
+        throw Exception('Failed to fetch inquiry details: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during fetch inquiry details: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// Send a message in an inquiry
+  Future<Map<String, dynamic>> sendInquiryMessage({
+    required String inquiryId,
+    required String message,
+    required String token,
+  }) async {
+    try {
+      print('🔵 Sending message to inquiry: $inquiryId');
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/inquiries/$inquiryId/messages'),
+        headers: _authHeaders(token),
+        body: jsonEncode({
+          'message': message,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ Message sent successfully');
+        return jsonDecode(response.body);
+      } else {
+        print('❌ Failed to send message: ${response.statusCode}');
+        throw Exception('Failed to send message: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during send message: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// Update inquiry status
+  Future<Map<String, dynamic>> updateInquiryStatus({
+    required String inquiryId,
+    required String status,
+    required String token,
+  }) async {
+    try {
+      print('🔵 Updating inquiry status: $inquiryId to $status');
+      
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/inquiries/$inquiryId/status'),
+        headers: _authHeaders(token),
+        body: jsonEncode({
+          'status': status,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Inquiry status updated successfully');
+        return jsonDecode(response.body);
+      } else {
+        print('❌ Failed to update inquiry status: ${response.statusCode}');
+        throw Exception('Failed to update inquiry status: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during update inquiry status: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// Delete a specific message (only own messages)
+  Future<Map<String, dynamic>> deleteMessage({
+    required String inquiryId,
+    required String messageId,
+    required String token,
+  }) async {
+    try {
+      print('🔵 Deleting message: $messageId from inquiry: $inquiryId');
+      
+      final response = await http.delete(
+        Uri.parse('$baseUrl/api/inquiries/$inquiryId/messages/$messageId'),
+        headers: _authHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Message deleted successfully');
+        return jsonDecode(response.body);
+      } else {
+        print('❌ Failed to delete message: ${response.statusCode}');
+        throw Exception('Failed to delete message: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during delete message: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// Hide a specific chat
+  Future<Map<String, dynamic>> hideChat({
+    required String inquiryId,
+    required String token,
+  }) async {
+    try {
+      print('🔵 Hiding chat: $inquiryId');
+      
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/inquiries/$inquiryId/hide'),
+        headers: _authHeaders(token),
+        body: jsonEncode({'hidden': true}),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Chat hidden successfully');
+        return jsonDecode(response.body);
+      } else {
+        print('❌ Failed to hide chat: ${response.statusCode}');
+        throw Exception('Failed to hide chat: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during hide chat: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// Unhide a specific chat
+  Future<Map<String, dynamic>> unhideChat({
+    required String inquiryId,
+    required String token,
+  }) async {
+    try {
+      print('🔵 Unhiding chat: $inquiryId');
+      
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/inquiries/$inquiryId/hide'),
+        headers: _authHeaders(token),
+        body: jsonEncode({'hidden': false}),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Chat unhidden successfully');
+        return jsonDecode(response.body);
+      } else {
+        print('❌ Failed to unhide chat: ${response.statusCode}');
+        throw Exception('Failed to unhide chat: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during unhide chat: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// Get hidden chats for current user
+  Future<List<Map<String, dynamic>>> getHiddenChats(String token) async {
+    try {
+      print('🔵 Fetching hidden chats...');
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/inquiries/hidden'),
+        headers: _authHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Hidden chats fetched successfully');
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data);
+      } else {
+        print('❌ Failed to fetch hidden chats: ${response.statusCode}');
+        throw Exception('Failed to fetch hidden chats: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during fetch hidden chats: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
 }
