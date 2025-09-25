@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/profile_widgets.dart';
 import '../notifications/notifications_screen.dart';
+import 'guest_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -55,6 +56,11 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
+        // Check if user is a guest (not authenticated)
+        if (authProvider.isGuest) {
+          return const GuestProfileScreen();
+        }
+
         // Debug logging for consumer profile updates
         print('🔵 Profile screen rebuild - User type: ${authProvider.user?.userType}');
         print('🔵 Profile screen rebuild - Display name: ${authProvider.user?.displayName}');

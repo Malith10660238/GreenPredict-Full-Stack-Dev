@@ -609,6 +609,40 @@ Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
     }
   }
 
+  /// Send a message in an inquiry (with image support)
+  Future<bool> sendMessage({
+    required String inquiryId,
+    required String message,
+    required String token,
+    bool isImage = false,
+    String? imagePath,
+  }) async {
+    try {
+      print('🔵 Sending message to inquiry: $inquiryId');
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/inquiries/$inquiryId/messages'),
+        headers: _authHeaders(token),
+        body: jsonEncode({
+          'message': message,
+          'isImage': isImage,
+          'imagePath': imagePath,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ Message sent successfully');
+        return true;
+      } else {
+        print('❌ Failed to send message: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Network error during send message: $e');
+      return false;
+    }
+  }
+
   /// Update inquiry status
   Future<Map<String, dynamic>> updateInquiryStatus({
     required String inquiryId,

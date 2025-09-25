@@ -35,8 +35,9 @@ class _MainNavigationState extends State<MainNavigation> {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
         final isFarmer = authProvider.isFarmer;
+        final isGuest = authProvider.isGuest;
 
-        // Different screens for farmers vs consumers
+        // Different screens for farmers vs consumers vs guests
         final List<Widget> farmerScreens = [
           HomeScreen(onMenuTap: _openDrawer),
           const AIPredictionScreen(),
@@ -50,7 +51,13 @@ class _MainNavigationState extends State<MainNavigation> {
           const ProfileScreen(),
         ];
 
-        final screens = isFarmer ? farmerScreens : consumerScreens;
+        final List<Widget> guestScreens = [
+          HomeScreen(onMenuTap: _openDrawer),
+          const MarketplaceScreen(),
+          const ProfileScreen(),
+        ];
+
+        final screens = isGuest ? guestScreens : (isFarmer ? farmerScreens : consumerScreens);
 
         // Adjust current index if consumer switches to farmer view or vice versa
         if (_currentIndex >= screens.length) {
@@ -95,7 +102,7 @@ class _MainNavigationState extends State<MainNavigation> {
                 fontWeight: FontWeight.w600,
               ),
               unselectedLabelStyle: AppTheme.caption,
-              items: isFarmer ? _farmerNavItems() : _consumerNavItems(),
+              items: isGuest ? _guestNavItems() : (isFarmer ? _farmerNavItems() : _consumerNavItems()),
             ),
           ),
         );
@@ -129,6 +136,26 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   List<BottomNavigationBarItem> _consumerNavItems() {
+    return const [
+      BottomNavigationBarItem(
+        icon: Icon(Icons.home_outlined),
+        activeIcon: Icon(Icons.home),
+        label: 'Home',
+      ),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.store_outlined),
+        activeIcon: Icon(Icons.store),
+        label: 'Marketplace',
+      ),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.person_outline),
+        activeIcon: Icon(Icons.person),
+        label: 'Profile',
+      ),
+    ];
+  }
+
+  List<BottomNavigationBarItem> _guestNavItems() {
     return const [
       BottomNavigationBarItem(
         icon: Icon(Icons.home_outlined),

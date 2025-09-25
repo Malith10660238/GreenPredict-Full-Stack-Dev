@@ -103,6 +103,8 @@ class InquiryMessage {
   final DateTime timestamp;
   final bool isFromFarmer;
   final String? messageId;
+  final String? imagePath;
+  final bool isImage;
 
   InquiryMessage({
     required this.id,
@@ -113,6 +115,8 @@ class InquiryMessage {
     required this.timestamp,
     required this.isFromFarmer,
     this.messageId,
+    this.imagePath,
+    this.isImage = false,
   });
 
   factory InquiryMessage.fromJson(Map<String, dynamic> json) {
@@ -125,6 +129,8 @@ class InquiryMessage {
       timestamp: DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()),
       isFromFarmer: json['isFromFarmer'] ?? false,
       messageId: json['messageId'],
+      imagePath: json['imagePath'],
+      isImage: json['isImage'] ?? false,
     );
   }
 
@@ -138,6 +144,8 @@ class InquiryMessage {
       'timestamp': timestamp.toIso8601String(),
       'isFromFarmer': isFromFarmer,
       'messageId': messageId,
+      'imagePath': imagePath,
+      'isImage': isImage,
     };
   }
 }

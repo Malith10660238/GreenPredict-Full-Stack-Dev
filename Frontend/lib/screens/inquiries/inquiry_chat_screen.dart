@@ -1,7 +1,12 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../models/inquiry.dart';
@@ -70,6 +75,15 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
         _messages = updatedInquiry.messages;
         _isLoading = false;
       });
+      
+      // Merge backend messages with local image data
+      await _mergeBackendMessagesWithLocalImages();
+      
+      // Clean up old image data
+      await _cleanupOldImageData();
+      
+      // Update state with merged messages
+      setState(() {});
       
       // Notify parent of updated inquiry
       widget.onInquiryUpdated(updatedInquiry);
@@ -458,14 +472,16 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
       );
       
       if (image != null) {
-        // TODO: Upload image to server and send as message
-        // For now, we'll just show a placeholder
+        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image selected! Upload functionality coming soon.'),
+          SnackBar(
+            content: Text('Image selected: ${image.name}'),
             backgroundColor: AppTheme.primaryGreen,
           ),
         );
+        
+        // Auto-send the image
+        await _sendImageMessage(image.path);
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -474,6 +490,298 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<String> _copyImageToPersistentStorage(String imagePath) async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final chatImagesDir = Directory(path.join(directory.path, 'chat_images'));
+      
+      if (!await chatImagesDir.exists()) {
+        await chatImagesDir.create(recursive: true);
+      }
+      
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(imagePath)}';
+      final newPath = path.join(chatImagesDir.path, fileName);
+      
+      await File(imagePath).copy(newPath);
+      return newPath;
+    } catch (e) {
+      print('Error copying image: $e');
+      return imagePath; // Return original path if copy fails
+    }
+  }
+
+  Future<void> _saveImageMessageToLocal(InquiryMessage message) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Use timestamp and sender as key for better matching
+      final key = 'image_${widget.inquiry.id}_${message.senderId}_${message.timestamp.millisecondsSinceEpoch}';
+      final messageData = {
+        'imagePath': message.imagePath,
+        'timestamp': message.timestamp.toIso8601String(),
+        'senderId': message.senderId,
+        'message': message.message,
+        'used': false, // Mark as unused initially
+      };
+      await prefs.setString(key, jsonEncode(messageData));
+      print('💾 Saved image message: $key');
+    } catch (e) {
+      print('Error saving image message: $e');
+    }
+  }
+
+  Future<void> _markImageAsUsed(String imagePath) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys().where((key) => 
+        key.startsWith('image_${widget.inquiry.id}_')).toList();
+      
+      for (final key in keys) {
+        final messageData = prefs.getString(key);
+        if (messageData != null) {
+          final data = jsonDecode(messageData);
+          if (data['imagePath'] == imagePath) {
+            data['used'] = true;
+            await prefs.setString(key, jsonEncode(data));
+            print('✅ Marked image as used: $imagePath');
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      print('Error marking image as used: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> _findLocalImageForMessage(InquiryMessage message) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Get all keys for this inquiry and sender
+      final keys = prefs.getKeys().where((key) => 
+        key.startsWith('image_${widget.inquiry.id}_${message.senderId}_')).toList();
+      
+      print('🔍 Searching through ${keys.length} local images for sender: ${message.senderId}');
+      
+      // First try: Find by exact timestamp match (within 30 seconds tolerance)
+      final messageTime = message.timestamp.millisecondsSinceEpoch;
+      final tolerance = 30000; // 30 seconds
+      
+      for (final key in keys) {
+        try {
+          final messageData = prefs.getString(key);
+          if (messageData != null) {
+            final data = jsonDecode(messageData);
+            final savedTime = DateTime.parse(data['timestamp']).millisecondsSinceEpoch;
+            
+            // Check if timestamps are close
+            if ((messageTime - savedTime).abs() <= tolerance) {
+              final imageFile = File(data['imagePath']);
+              if (await imageFile.exists()) {
+                print('✅ Found image by timestamp match: ${data['imagePath']}');
+                return data;
+              }
+            }
+          }
+        } catch (e) {
+          print('Error parsing saved image data: $e');
+        }
+      }
+      
+      // Second try: Find unused image by message content pattern
+      for (final key in keys) {
+        try {
+          final messageData = prefs.getString(key);
+          if (messageData != null) {
+            final data = jsonDecode(messageData);
+            
+            // Check if this is an unused image message
+            if (data['used'] != true && 
+                data['message'] != null && 
+                (data['message'].contains('📷 Image') || 
+                 data['message'].contains('Image shared'))) {
+              
+              final imageFile = File(data['imagePath']);
+              if (await imageFile.exists()) {
+                print('✅ Found unused image by content match: ${data['imagePath']}');
+                return data;
+              }
+            }
+          }
+        } catch (e) {
+          print('Error parsing saved image data: $e');
+        }
+      }
+      
+      // Third try: Find any unused image for this sender (fallback)
+      for (final key in keys) {
+        try {
+          final messageData = prefs.getString(key);
+          if (messageData != null) {
+            final data = jsonDecode(messageData);
+            
+            // Check if this is an unused image
+            if (data['used'] != true) {
+              final imageFile = File(data['imagePath']);
+              if (await imageFile.exists()) {
+                print('✅ Found unused image by fallback match: ${data['imagePath']}');
+                return data;
+              }
+            }
+          }
+        } catch (e) {
+          print('Error parsing saved image data: $e');
+        }
+      }
+      
+      print('❌ No local image found for: ${message.message}');
+    } catch (e) {
+      print('Error finding local image: $e');
+    }
+    return null;
+  }
+
+  Future<void> _mergeBackendMessagesWithLocalImages() async {
+    try {
+      print('🔄 Merging backend messages with local images...');
+      for (int i = 0; i < _messages.length; i++) {
+        final message = _messages[i];
+        
+        // Check if this is a backend message about an image
+        if (message.message.contains('📷 Image shared') || 
+            message.message.contains('📷 Image:')) {
+          
+          print('🔍 Looking for local image for: ${message.message}');
+          
+          // Try to find local image data for this message
+          final localImageData = await _findLocalImageForMessage(message);
+          
+          if (localImageData != null && localImageData['imagePath'] != null) {
+            print('✅ Found local image, updating message');
+            
+            // Mark the image as used
+            await _markImageAsUsed(localImageData['imagePath']);
+            
+            // Update the message with image data
+            _messages[i] = InquiryMessage(
+              id: message.id,
+              inquiryId: message.inquiryId,
+              senderId: message.senderId,
+              senderName: message.senderName,
+              message: message.message,
+              timestamp: message.timestamp,
+              isFromFarmer: message.isFromFarmer,
+              messageId: message.messageId,
+              imagePath: localImageData['imagePath'],
+              isImage: true,
+            );
+          } else {
+            print('❌ No local image found for: ${message.message}');
+          }
+        }
+      }
+      print('✅ Finished merging messages');
+    } catch (e) {
+      print('Error merging messages: $e');
+    }
+  }
+
+  Future<void> _cleanupOldImageData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys().where((key) => 
+        key.startsWith('image_${widget.inquiry.id}_')).toList();
+      
+      // Keep only the last 50 images per inquiry to prevent storage bloat
+      if (keys.length > 50) {
+        final sortedKeys = keys.toList()..sort();
+        final keysToRemove = sortedKeys.take(keys.length - 50);
+        
+        for (final key in keysToRemove) {
+          await prefs.remove(key);
+        }
+        print('🧹 Cleaned up old image data');
+      }
+    } catch (e) {
+      print('Error cleaning up image data: $e');
+    }
+  }
+
+  Future<void> _sendImageMessage(String imagePath) async {
+    if (_isSending) return;
+    
+    setState(() {
+      _isSending = true;
+    });
+
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.authToken;
+      
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Copy image to persistent storage
+      final persistentImagePath = await _copyImageToPersistentStorage(imagePath);
+
+      // Create a message with image for immediate display
+      final imageMessage = InquiryMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        inquiryId: widget.inquiry.id,
+        senderId: authProvider.user?.uid ?? '',
+        senderName: authProvider.user?.displayName ?? 'You',
+        message: '📷 Image',
+        timestamp: DateTime.now(),
+        isFromFarmer: widget.isFarmer,
+        messageId: DateTime.now().millisecondsSinceEpoch.toString(),
+        imagePath: persistentImagePath,
+        isImage: true,
+      );
+
+      // Add to local messages immediately
+      setState(() {
+        _messages.add(imageMessage);
+      });
+
+      // Save image message to local storage
+      await _saveImageMessageToLocal(imageMessage);
+
+      // Scroll to bottom
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+
+      // Send a simple text message to backend (without image data for now)
+      try {
+        await _apiService.sendInquiryMessage(
+          inquiryId: widget.inquiry.id,
+          message: '📷 Image shared',
+          token: token,
+        );
+      } catch (e) {
+        // If backend fails, keep the local message
+        print('Backend send failed, keeping local message: $e');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isSending = false;
+      });
     }
   }
 
@@ -523,15 +831,65 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      message.message,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: isFromCurrentUser 
-                            ? Colors.white 
-                            : Colors.black87,
+                    // Check if message is an image message
+                    if (message.isImage && message.imagePath != null) ...[
+                      // Image message display
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(message.imagePath!),
+                          width: 200,
+                          height: 200,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 200,
+                              height: 200,
+                              color: Colors.grey[300],
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.broken_image,
+                                    size: 40,
+                                    color: Colors.grey[600],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Image not found',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '📷 Image',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isFromCurrentUser 
+                              ? Colors.white70 
+                              : Colors.grey[600],
+                        ),
+                      ),
+                    ] else ...[
+                      // Regular text message
+                      Text(
+                        message.message,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isFromCurrentUser 
+                              ? Colors.white 
+                              : Colors.black87,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       _formatTime(message.timestamp),

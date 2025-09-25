@@ -127,6 +127,7 @@ class AuthProvider with ChangeNotifier {
   String? get profileImageUrl => _profileImageUrl;
   String? get authToken => _authToken;
   bool get isAuthenticated => _user != null;
+  bool get isGuest => _user == null;
   bool get isFarmer => _user?.userType == 'farmer';
   bool get isConsumer => _user?.userType == 'consumer';
 
