@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -23,6 +24,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late Animation<double> _glowAnimation;
   late Animation<double> _floatAnimation;
   
+  // Page controller for Platform Features
+  late PageController _featuresPageController;
+  int _currentFeatureIndex = 0;
+  Timer? _autoScrollTimer;
+  bool _isUserInteracting = false;
+  static const int _totalFeatures = 4;
+  static const int _infiniteMultiplier = 1000; // Large number for infinite scroll
+  
   // TODO: Fetch real weather data from API
   Map<String, dynamic> _weatherData = {
     'temperature': 28,
@@ -36,6 +45,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _initializeAnimations();
+    // Start from middle of infinite scroll
+    _featuresPageController = PageController(
+      viewportFraction: 0.9,
+      initialPage: (_totalFeatures * _infiniteMultiplier) ~/ 2,
+    );
+    _startAutoScroll();
   }
 
   @override
@@ -43,6 +58,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _pulseController.dispose();
     _glowController.dispose();
     _floatController.dispose();
+    _featuresPageController.dispose();
+    _autoScrollTimer?.cancel();
     super.dispose();
   }
 
@@ -92,6 +109,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _floatController.repeat(reverse: true);
   }
 
+  void _startAutoScroll() {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      if (!_isUserInteracting && _featuresPageController.hasClients) {
+        // Always move forward to next card in infinite scroll
+        final currentPage = _featuresPageController.page?.round() ?? 0;
+        final nextPage = currentPage + 1;
+        
+        _featuresPageController.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  void _pauseAutoScroll() {
+    _isUserInteracting = true;
+    _autoScrollTimer?.cancel();
+  }
+
+  void _resumeAutoScroll() {
+    _isUserInteracting = false;
+    _startAutoScroll();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -127,12 +171,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           if (authProvider.isAuthenticated) ...[
                             _buildPersonalizedGreeting(authProvider),
                             const SizedBox(height: 24),
+                            // Show Platform Features right after greeting for Consumer users only
+                            if (!authProvider.isFarmer) ...[
+                              _buildModernFeatures(context, authProvider),
+                              const SizedBox(height: 24),
+                            ],
                             _buildWhyGreenPredict(),
                             const SizedBox(height: 24),
-                            _buildSeasonalTrends(),
-                            const SizedBox(height: 24),
-                            _buildMarketAlerts(),
-                            const SizedBox(height: 24),
+                            // Show Seasonal Trends and Market Alerts only for Farmer users
+                            if (authProvider.isFarmer) ...[
+                              _buildSeasonalTrends(),
+                              const SizedBox(height: 24),
+                              _buildMarketAlerts(),
+                              const SizedBox(height: 24),
+                            ],
                             _buildShortcuts(context, authProvider),
                             const SizedBox(height: 24),
                           ] else ...[
@@ -140,8 +192,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             const SizedBox(height: 32),
                           ],
                           
-                          _buildModernFeatures(context, authProvider),
-                          const SizedBox(height: 32),
+                          // Show Platform Features at bottom for non-authenticated users
+                          if (!authProvider.isAuthenticated) ...[
+                            _buildModernFeatures(context, authProvider),
+                            const SizedBox(height: 32),
+                          ],
                           
                           if (!authProvider.isAuthenticated) 
                             _buildCallToAction(context),
@@ -1043,14 +1098,67 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildModernFeatures(BuildContext context, AuthProvider authProvider) {
+    // Consumer-specific features with images - 2-tone green theme
+    final consumerFeatures = [
+      {
+        'icon': Icons.shopping_basket,
+        'title': 'Fresh Marketplace',
+        'description': 'Buy directly from farmers',
+        'image': 'https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=500&h=400&fit=crop',
+        'color': AppTheme.primaryGreen,
+        'gradient': LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppTheme.primaryGreen, AppTheme.primaryGreen.withOpacity(0.7)],
+        ),
+      },
+      {
+        'icon': Icons.eco,
+        'title': 'Organic Quality',
+        'description': 'Premium organic produce',
+        'image': 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&h=400&fit=crop',
+        'color': AppTheme.primaryGreen,
+        'gradient': LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppTheme.primaryGreen, AppTheme.primaryGreen.withOpacity(0.7)],
+        ),
+      },
+      {
+        'icon': Icons.location_on,
+        'title': 'Local Sourcing',
+        'description': 'Support local farmers',
+        'image': 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=500&h=400&fit=crop',
+        'color': AppTheme.primaryGreen,
+        'gradient': LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppTheme.primaryGreen, AppTheme.primaryGreen.withOpacity(0.7)],
+        ),
+      },
+      {
+        'icon': Icons.verified_user,
+        'title': 'Trusted Sellers',
+        'description': 'Quality assured farmers',
+        'image': 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=500&h=400&fit=crop',
+        'color': AppTheme.primaryGreen,
+        'gradient': LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppTheme.primaryGreen, AppTheme.primaryGreen.withOpacity(0.7)],
+        ),
+      },
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Header with improved alignment
         Row(
           children: [
             Container(
               width: 4,
-              height: 24,
+              height: 28,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
@@ -1063,119 +1171,134 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(width: 12),
-            Text(
-              'Platform Features',
-              style: AppTheme.heading2.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textDark,
-                fontSize: 22,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Consumer Features',
+                    style: AppTheme.heading2.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textDark,
+                      fontSize: 24,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Everything you need for fresh shopping',
+                    style: AppTheme.bodyMedium.copyWith(
+                      color: AppTheme.darkGray,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const Spacer(),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: AppTheme.primaryGreen.withOpacity(0.1),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppTheme.primaryGreen.withOpacity(0.1),
+                    AppTheme.primaryGreen.withOpacity(0.05),
+                  ],
+                ),
                 borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppTheme.primaryGreen.withOpacity(0.2),
+                  width: 1,
+                ),
               ),
               child: Text(
                 '4 Features',
                 style: AppTheme.bodySmall.copyWith(
                   color: AppTheme.primaryGreen,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
                 ),
               ),
             ),
           ],
         ),
         
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
         
+        // Feature cards with improved layout
         SizedBox(
-          height: 320,
+          height: 450,
           child: Column(
             children: [
               Expanded(
-                child: PageView.builder(
-                  controller: PageController(viewportFraction: 0.9),
-                  itemCount: 4,
+                child: GestureDetector(
+                  onPanStart: (_) => _pauseAutoScroll(),
+                  onTapDown: (_) => _pauseAutoScroll(),
+                  child: PageView.builder(
+                    controller: _featuresPageController,
+                    itemCount: _totalFeatures * _infiniteMultiplier,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentFeatureIndex = index % _totalFeatures;
+                      });
+                      // Resume auto-scroll after user interaction
+                      Future.delayed(const Duration(seconds: 1), () {
+                        _resumeAutoScroll();
+                      });
+                    },
                   itemBuilder: (context, index) {
-              final features = [
-                {
-                  'icon': Icons.psychology_alt,
-                  'title': 'AI Intelligence',
-                  'description': 'Smart predictions & insights',
-                  'color': const Color(0xFF8B5CF6),
-                  'gradient': const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
-                  ),
-                },
-                {
-                  'icon': Icons.eco,
-                  'title': 'Sustainability',
-                  'description': 'Eco-friendly farming',
-                  'color': const Color(0xFF10B981),
-                  'gradient': const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF10B981), Color(0xFF059669)],
-                  ),
-                },
-                {
-                  'icon': Icons.storefront,
-                  'title': 'Direct Market',
-                  'description': 'No middlemen',
-                  'color': const Color(0xFFF59E0B),
-                  'gradient': const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
-                  ),
-                },
-                {
-                  'icon': Icons.verified_user,
-                  'title': 'Quality Assured',
-                  'description': 'Premium products',
-                  'color': const Color(0xFF06B6D4),
-                  'gradient': const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF06B6D4), Color(0xFF0891B2)],
-                  ),
-                },
-              ];
-              
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-                child: _buildModernFeatureCard(
-                  icon: features[index]['icon'] as IconData,
-                  title: features[index]['title'] as String,
-                  description: features[index]['description'] as String,
-                  color: features[index]['color'] as Color,
-                  gradient: features[index]['gradient'] as LinearGradient,
-                  index: index,
-                ),
-              );
+                    final featureIndex = index % _totalFeatures;
+                    final feature = consumerFeatures[featureIndex];
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      child: _buildConsumerFeatureCard(
+                        icon: feature['icon'] as IconData,
+                        title: feature['title'] as String,
+                        description: feature['description'] as String,
+                        imageUrl: feature['image'] as String,
+                        color: feature['color'] as Color,
+                        gradient: feature['gradient'] as LinearGradient,
+                        index: featureIndex,
+                      ),
+                    );
                   },
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              // Page indicator
+              const SizedBox(height: 20),
+              // Working page indicators
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(4, (index) {
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: index == 0 
-                          ? AppTheme.primaryGreen 
-                          : AppTheme.primaryGreen.withOpacity(0.3),
+                children: List.generate(consumerFeatures.length, (index) {
+                  return GestureDetector(
+                    onTap: () {
+                      _pauseAutoScroll();
+                      // Always animate forward, even if going to a lower index
+                      _featuresPageController.animateToPage(
+                        index,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
+                      width: _currentFeatureIndex == index ? 24 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(4),
+                        color: _currentFeatureIndex == index 
+                            ? AppTheme.primaryGreen 
+                            : AppTheme.primaryGreen.withOpacity(0.3),
+                        boxShadow: _currentFeatureIndex == index ? [
+                          BoxShadow(
+                            color: AppTheme.primaryGreen.withOpacity(0.4),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ] : null,
+                      ),
                     ),
                   );
                 }),
@@ -1187,24 +1310,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildModernFeatureCard({
+  Widget _buildConsumerFeatureCard({
     required IconData icon,
     required String title,
     required String description,
+    required String imageUrl,
     required Color color,
     required Gradient gradient,
     required int index,
   }) {
     return TweenAnimationBuilder<double>(
-      duration: Duration(milliseconds: 600 + (index * 100)),
+      duration: Duration(milliseconds: 500 + (index * 150)),
       tween: Tween(begin: 0.0, end: 1.0),
-      curve: Curves.easeOutBack,
+      curve: Curves.easeOutCubic,
       builder: (context, value, child) {
         return AnimatedBuilder(
           animation: _floatAnimation,
           builder: (context, child) {
             final floatOffset = (index % 2 == 0 ? 1 : -1) * 
-                (0.5 + 0.3 * _floatAnimation.value.clamp(0.0, 1.0));
+                (0.3 + 0.2 * _floatAnimation.value.clamp(0.0, 1.0));
             return Transform.translate(
               offset: Offset(0, floatOffset),
               child: Transform.scale(
@@ -1214,109 +1338,173 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: color.withOpacity(0.15.clamp(0.0, 1.0)),
+                          color: AppTheme.primaryGreen.withOpacity(0.15),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                           spreadRadius: 0,
                         ),
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05.clamp(0.0, 1.0)),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                       border: Border.all(
-                        color: color.withOpacity(0.1.clamp(0.0, 1.0)),
+                        color: AppTheme.primaryGreen.withOpacity(0.1),
                         width: 1,
                       ),
                     ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () {
-                          // Add haptic feedback
-                          // HapticFeedback.lightImpact();
-                        },
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
+                    child: Container(
+                          padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Icon with gradient background
+                              // Large image (flexible height)
+                              Expanded(
+                                flex: 5,
+                                child: Container(
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: color.withOpacity(0.2),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Stack(
+                                      children: [
+                                        // Background image
+                                        Image.network(
+                                          imageUrl,
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              decoration: BoxDecoration(
+                                                gradient: gradient,
+                                                borderRadius: BorderRadius.circular(16),
+                                              ),
+                                              child: Center(
+                                                child: Icon(
+                                                  icon,
+                                                  color: Colors.white,
+                                                  size: 48,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          loadingBuilder: (context, child, loadingProgress) {
+                                            if (loadingProgress == null) return child;
+                                            return Container(
+                                              decoration: BoxDecoration(
+                                                gradient: gradient,
+                                                borderRadius: BorderRadius.circular(16),
+                                              ),
+                                              child: Center(
+                                                child: CircularProgressIndicator(
+                                                  value: loadingProgress.expectedTotalBytes != null
+                                                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                      : null,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        // Gradient overlay
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topCenter,
+                                              end: Alignment.bottomCenter,
+                                              colors: [
+                                                Colors.transparent,
+                                                color.withOpacity(0.3),
+                                              ],
+                                            ),
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                        ),
+                                        // Icon overlay
+                                        Positioned(
+                                          top: 12,
+                                          right: 12,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withOpacity(0.9),
+                                              borderRadius: BorderRadius.circular(12),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withOpacity(0.1),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Icon(
+                                              icon,
+                                              color: color,
+                                              size: 24,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              
+                              // Text section with minimal space
                               Container(
-                                width: 56,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  gradient: gradient,
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: color.withOpacity(0.3),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Title with better typography
+                                    Text(
+                                      title,
+                                      style: AppTheme.bodyLarge.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: AppTheme.textDark.withOpacity(0.9),
+                                        fontSize: 18,
+                                        letterSpacing: -0.5,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    
+                                    const SizedBox(height: 2),
+                                    
+                                    // Description with improved readability
+                                    Text(
+                                      description,
+                                      style: AppTheme.bodyMedium.copyWith(
+                                        color: AppTheme.darkGray,
+                                        fontSize: 12,
+                                        height: 1.1,
+                                        letterSpacing: 0.1,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),
-                                child: Icon(
-                                  icon,
-                                  color: Colors.white,
-                                  size: 28,
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 16),
-                              
-                              // Title
-                              Text(
-                                title,
-                                style: AppTheme.bodyLarge.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.textDark,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 6),
-                              
-                              // Description
-                              Text(
-                                description,
-                                style: AppTheme.bodyMedium.copyWith(
-                                  color: AppTheme.darkGray,
-                                  fontSize: 13,
-                                  height: 1.3,
-                                ),
-                              ),
-                              
-                              const Spacer(),
-                              
-                              // Arrow indicator
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: color.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Icon(
-                                      Icons.arrow_forward_ios,
-                                      color: color,
-                                      size: 14,
-                                    ),
-                                  ),
-                                ],
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    ),
                   ),
                 ),
               ),
