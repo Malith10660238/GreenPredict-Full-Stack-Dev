@@ -700,6 +700,32 @@ Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
     }
   }
 
+  /// Delete an entire inquiry/conversation
+  Future<Map<String, dynamic>> deleteInquiry({
+    required String inquiryId,
+    required String token,
+  }) async {
+    try {
+      print('🔵 Deleting inquiry: $inquiryId');
+      
+      final response = await http.delete(
+        Uri.parse('$baseUrl/api/inquiries/$inquiryId'),
+        headers: _authHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Inquiry deleted successfully');
+        return jsonDecode(response.body);
+      } else {
+        print('❌ Failed to delete inquiry: ${response.statusCode}');
+        throw Exception('Failed to delete inquiry: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during delete inquiry: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
   /// Hide a specific chat
   Future<Map<String, dynamic>> hideChat({
     required String inquiryId,

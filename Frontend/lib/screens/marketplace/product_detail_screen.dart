@@ -6,8 +6,6 @@ import '../../providers/listing_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/date_utils.dart' as app_date;
 import '../../services/api_service.dart';
-import '../../models/inquiry.dart';
-import '../inquiries/inquiry_chat_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Map<String, dynamic> listing;
@@ -816,92 +814,111 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Future<void> _sendInquiry(BuildContext context, String message) async {
+  Future<void> _sendInquiry(BuildContext dialogContext, String message) async {
+    // Use the widget's context instead of dialog context
+    final mainContext = this.context;
     if (message.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      print('🔵 Showing empty message warning...');
+      ScaffoldMessenger.of(mainContext).showSnackBar(
         const SnackBar(
-          content: Text('Please enter a message.'),
+          content: Text('⚠️ Please enter a message before sending.'),
           backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      print('🔵 Empty message warning shown');
+      return;
+    }
+
+    // Close dialog immediately
+    Navigator.pop(dialogContext);
+    
+    final farmerId = widget.listing['farmerId']?.toString();
+    final productId = widget.listing['id']?.toString();
+    
+    if (farmerId == null || productId == null) {
+      ScaffoldMessenger.of(mainContext).showSnackBar(
+        const SnackBar(
+          content: Text('❌ Product information is missing. Please try again.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    print('🔵 Creating inquiry for farmer: $farmerId, product: $productId');
+    
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.authToken == null) {
+      ScaffoldMessenger.of(mainContext).showSnackBar(
+        const SnackBar(
+          content: Text('❌ Please log in to send messages.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
         ),
       );
       return;
     }
 
     try {
-      Navigator.pop(context); // Close dialog
-      
-      // Show loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
-          ),
-        ),
-      );
-
-      final farmerId = widget.listing['farmerId']?.toString();
-      final productId = widget.listing['id']?.toString();
-      
-      if (farmerId == null || productId == null) {
-        throw Exception('Missing farmer or product information');
-      }
-
-      print('🔵 Creating inquiry for farmer: $farmerId, product: $productId');
-      
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      if (authProvider.authToken == null) {
-        throw Exception('No authentication token available');
-      }
-
-      final inquiryData = await _apiService.createInquiry(
+      await _apiService.createInquiry(
         farmerId: farmerId,
         productId: productId,
         message: message,
         token: authProvider.authToken!,
       );
 
-      // Close loading dialog
-      Navigator.pop(context);
-
-      // Create inquiry object
-      final inquiry = Inquiry.fromJson(inquiryData);
-      
-      // Navigate to chat screen
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => InquiryChatScreen(
-            inquiry: inquiry,
-            isFarmer: false,
-            onInquiryUpdated: (updatedInquiry) {
-              // Handle inquiry updates if needed
-            },
-          ),
-        ),
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Inquiry sent successfully!'),
-          backgroundColor: AppTheme.primaryGreen,
-        ),
-      );
+      // Show success message immediately after Firebase records the inquiry
+      print('🔵 Showing success message...');
+      if (mounted) {
+        print('🔵 Widget is mounted, showing SnackBar');
+        // Add a small delay to ensure context is stable
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            try {
+              ScaffoldMessenger.of(mainContext).showSnackBar(
+                const SnackBar(
+                  content: Text('✅ Message sent successfully! The farmer will receive your inquiry.'),
+                  backgroundColor: AppTheme.primaryGreen,
+                  duration: Duration(seconds: 4),
+                ),
+              );
+              print('🔵 Success SnackBar shown');
+            } catch (e) {
+              print('❌ Error showing success SnackBar: $e');
+            }
+          }
+        });
+      } else {
+        print('❌ Widget not mounted, cannot show SnackBar');
+      }
 
     } catch (e) {
-      // Close loading dialog if still open
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
-      
       print('❌ Error sending inquiry: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to send inquiry: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      print('🔵 Showing error message...');
+      if (mounted) {
+        print('🔵 Widget is mounted, showing error SnackBar');
+        // Add a small delay to ensure context is stable
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            try {
+              ScaffoldMessenger.of(mainContext).showSnackBar(
+                SnackBar(
+                  content: Text('❌ Failed to send message. Please try again.'),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 3),
+                ),
+              );
+              print('🔵 Error SnackBar shown');
+            } catch (e) {
+              print('❌ Error showing error SnackBar: $e');
+            }
+          }
+        });
+      } else {
+        print('❌ Widget not mounted, cannot show error SnackBar');
+      }
     }
   }
 }

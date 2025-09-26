@@ -1162,6 +1162,43 @@ async def delete_message(inquiry_id: str, message_id: str, current_user: dict = 
             detail=f"Failed to delete message: {str(e)}"
         )
 
+@app.delete("/api/inquiries/{inquiry_id}")
+async def delete_inquiry(inquiry_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete an entire inquiry/conversation (only by consumer)"""
+    try:
+        inquiry_ref = db.collection("inquiries").document(inquiry_id)
+        inquiry_doc = inquiry_ref.get()
+        
+        if not inquiry_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Inquiry not found"
+            )
+        
+        inquiry_data = inquiry_doc.to_dict()
+        
+        # Check if user is the consumer (only consumers can delete entire conversations)
+        if inquiry_data["consumerId"] != current_user["uid"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the consumer can delete this conversation"
+            )
+        
+        # Delete the entire inquiry document
+        inquiry_ref.delete()
+        
+        return {
+            "message": "Inquiry deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete inquiry: {str(e)}"
+        )
+
 if __name__ == "__main__":
     uvicorn.run(
         "main_firebase:app",

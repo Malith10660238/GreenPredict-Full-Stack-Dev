@@ -885,14 +885,37 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
                       ),
                     ],
                     const SizedBox(height: 4),
-                    Text(
-                      _formatTime(message.timestamp),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isFromCurrentUser 
-                            ? Colors.white70 
-                            : Colors.grey[500],
-                      ),
+                    // Time and delete button row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatTime(message.timestamp),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isFromCurrentUser 
+                                ? Colors.white70 
+                                : Colors.grey[500],
+                          ),
+                        ),
+                        // Delete button for consumers only
+                        if (isFromCurrentUser && !widget.isFarmer)
+                          GestureDetector(
+                            onTap: () => _deleteMessage(message),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Icon(
+                                Icons.delete_outline,
+                                size: 16,
+                                color: Colors.red[600],
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -918,6 +941,63 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
     } else {
       // Other days - show date and time
       return '${timestamp.day}/${timestamp.month} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+    }
+  }
+
+  Future<void> _deleteMessage(InquiryMessage message) async {
+    try {
+      // Show confirmation dialog
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete Message'),
+          content: const Text('Are you sure you want to delete this message?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        // Remove message from local list
+        setState(() {
+          _messages.removeWhere((m) => m.id == message.id);
+        });
+
+        // Call API to delete message
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        if (authProvider.authToken != null) {
+          await _apiService.deleteMessage(
+            inquiryId: message.inquiryId,
+            messageId: message.id,
+            token: authProvider.authToken!,
+          );
+        }
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Message deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error deleting message: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to delete message: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -1074,41 +1154,6 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
     );
   }
 
-  void _deleteMessage(InquiryMessage message) async {
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      if (authProvider.authToken == null) {
-        throw Exception('No authentication token available');
-      }
-
-      // Use the message ID from the message object
-      final messageId = message.messageId ?? '${message.senderId}_${message.timestamp.millisecondsSinceEpoch}';
-      
-      await _apiService.deleteMessage(
-        inquiryId: widget.inquiry.id,
-        messageId: messageId,
-        token: authProvider.authToken!,
-      );
-      
-      setState(() {
-        _messages.removeWhere((m) => m.messageId == message.messageId);
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Message deleted successfully'),
-          backgroundColor: AppTheme.primaryGreen,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to delete message: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
 
   void _copyMessage(String message) {
     // TODO: Implement clipboard functionality

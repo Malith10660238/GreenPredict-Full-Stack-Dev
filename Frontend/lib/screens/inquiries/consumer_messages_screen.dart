@@ -316,6 +316,23 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                           ),
                         ),
                       ),
+                    const SizedBox(width: 8),
+                    // Delete button for consumers only
+                    GestureDetector(
+                      onTap: () => _hideConversation(message),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: Colors.red[600],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -346,6 +363,62 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _hideConversation(Inquiry inquiry) async {
+    try {
+      // Show confirmation dialog
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete Conversation'),
+          content: const Text('Are you sure you want to delete this entire conversation? This action cannot be undone and the farmer will no longer be able to access it.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        // Remove from local list immediately
+        setState(() {
+          _messages.removeWhere((m) => m.id == inquiry.id);
+        });
+
+        // Call API to delete inquiry from Firebase
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        if (authProvider.authToken != null) {
+          await _apiService.deleteInquiry(
+            inquiryId: inquiry.id,
+            token: authProvider.authToken!,
+          );
+        }
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conversation deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error deleting conversation: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to delete conversation: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _showSearchDialog() {
