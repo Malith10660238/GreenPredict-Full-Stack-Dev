@@ -1101,6 +1101,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // Consumer-specific features with images - 2-tone green theme
     final consumerFeatures = [
       {
+        'icon': Icons.verified_user,
+        'title': 'Trusted Sellers',
+        'description': 'Quality assured farmers',
+        'image': 'assets/images/banner 1.jpg',
+        'color': AppTheme.primaryGreen,
+        'gradient': LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppTheme.primaryGreen, AppTheme.primaryGreen.withOpacity(0.7)],
+        ),
+      },
+      {
         'icon': Icons.shopping_basket,
         'title': 'Fresh Marketplace',
         'description': 'Buy directly from farmers',
@@ -1128,19 +1140,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         'icon': Icons.location_on,
         'title': 'Local Sourcing',
         'description': 'Support local farmers',
-        'image': 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=500&h=400&fit=crop',
-        'color': AppTheme.primaryGreen,
-        'gradient': LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppTheme.primaryGreen, AppTheme.primaryGreen.withOpacity(0.7)],
-        ),
-      },
-      {
-        'icon': Icons.verified_user,
-        'title': 'Trusted Sellers',
-        'description': 'Quality assured farmers',
-        'image': 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=500&h=400&fit=crop',
+        'image': 'assets/images/banner 2.jpg',
         'color': AppTheme.primaryGreen,
         'gradient': LinearGradient(
           begin: Alignment.topLeft,
@@ -1382,44 +1382,66 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     child: Stack(
                                       children: [
                                         // Background image
-                                        Image.network(
-                                          imageUrl,
-                                          width: double.infinity,
-                                          height: double.infinity,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return Container(
-                                              decoration: BoxDecoration(
-                                                gradient: gradient,
-                                                borderRadius: BorderRadius.circular(16),
-                                              ),
-                                              child: Center(
-                                                child: Icon(
-                                                  icon,
-                                                  color: Colors.white,
-                                                  size: 48,
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                          loadingBuilder: (context, child, loadingProgress) {
-                                            if (loadingProgress == null) return child;
-                                            return Container(
-                                              decoration: BoxDecoration(
-                                                gradient: gradient,
-                                                borderRadius: BorderRadius.circular(16),
-                                              ),
-                                              child: Center(
-                                                child: CircularProgressIndicator(
-                                                  value: loadingProgress.expectedTotalBytes != null
-                                                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                                      : null,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        ),
+                                        imageUrl.startsWith('http') 
+                                          ? Image.network(
+                                              imageUrl,
+                                              width: double.infinity,
+                                              height: double.infinity,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) {
+                                                return Container(
+                                                  decoration: BoxDecoration(
+                                                    gradient: gradient,
+                                                    borderRadius: BorderRadius.circular(16),
+                                                  ),
+                                                  child: Center(
+                                                    child: Icon(
+                                                      icon,
+                                                      color: Colors.white,
+                                                      size: 48,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              loadingBuilder: (context, child, loadingProgress) {
+                                                if (loadingProgress == null) return child;
+                                                return Container(
+                                                  decoration: BoxDecoration(
+                                                    gradient: gradient,
+                                                    borderRadius: BorderRadius.circular(16),
+                                                  ),
+                                                  child: Center(
+                                                    child: CircularProgressIndicator(
+                                                      value: loadingProgress.expectedTotalBytes != null
+                                                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                          : null,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            )
+                                          : Image.asset(
+                                              imageUrl,
+                                              width: double.infinity,
+                                              height: double.infinity,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) {
+                                                return Container(
+                                                  decoration: BoxDecoration(
+                                                    gradient: gradient,
+                                                    borderRadius: BorderRadius.circular(16),
+                                                  ),
+                                                  child: Center(
+                                                    child: Icon(
+                                                      icon,
+                                                      color: Colors.white,
+                                                      size: 48,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
                                         // Gradient overlay
                                         Container(
                                           decoration: BoxDecoration(
@@ -1432,30 +1454,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                               ],
                                             ),
                                             borderRadius: BorderRadius.circular(16),
-                                          ),
-                                        ),
-                                        // Icon overlay
-                                        Positioned(
-                                          top: 12,
-                                          right: 12,
-                                          child: Container(
-                                            padding: const EdgeInsets.all(8),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white.withOpacity(0.9),
-                                              borderRadius: BorderRadius.circular(12),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black.withOpacity(0.1),
-                                                  blurRadius: 8,
-                                                  offset: const Offset(0, 2),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Icon(
-                                              icon,
-                                              color: color,
-                                              size: 24,
-                                            ),
                                           ),
                                         ),
                                       ],
