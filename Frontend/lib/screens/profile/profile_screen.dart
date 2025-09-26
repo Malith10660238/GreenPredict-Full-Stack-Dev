@@ -18,6 +18,14 @@ class _ProfileScreenState extends State<ProfileScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  
+  // Page controllers for statistics
+  PageController? _farmerStatsController;
+  PageController? _consumerStatsController;
+  
+  // Current page indices
+  int _farmerCurrentPage = 0;
+  int _consumerCurrentPage = 0;
 
   @override
   void initState() {
@@ -43,12 +51,18 @@ class _ProfileScreenState extends State<ProfileScreen>
       curve: Curves.easeOutCubic,
     ));
     
+    // Initialize page controllers
+    _farmerStatsController = PageController(viewportFraction: 0.85);
+    _consumerStatsController = PageController(viewportFraction: 0.85);
+    
     _animationController.forward();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _farmerStatsController?.dispose();
+    _consumerStatsController?.dispose();
     super.dispose();
   }
 
@@ -92,16 +106,20 @@ class _ProfileScreenState extends State<ProfileScreen>
                   child: SlideTransition(
                     position: _slideAnimation,
                     child: Padding(
-                      padding: const EdgeInsets.all(20.0),
+                      padding: const EdgeInsets.fromLTRB(20.0, 30.0, 20.0, 20.0),
                       child: Column(
                         children: [
+                          // Welcome Section
+                          _buildWelcomeSection(authProvider),
+                          const SizedBox(height: 20),
+                          
                           // Bio Section
                           if (authProvider.user?.bio != null) ...[
                             ProfileBioCard(
                               bio: authProvider.user!.bio!,
                               onEdit: () => _showEditBioDialog(context, authProvider),
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 24),
                           ],
                           
                           // Stats Section
@@ -110,12 +128,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                           else
                             _buildConsumerStats(context, authProvider),
                           
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 24),
                           
                           // Profile Information
                           _buildProfileInfo(context, authProvider),
                           
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 24),
                           
                           // Settings
                           _buildSettingsCard(context, authProvider),
@@ -132,11 +150,97 @@ class _ProfileScreenState extends State<ProfileScreen>
       },
     );
   }
+
+  Widget _buildWelcomeSection(AuthProvider authProvider) {
+    final user = authProvider.user!;
+    final isFarmer = user.userType == 'farmer';
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isFarmer
+              ? [
+                  AppTheme.primaryGreen.withOpacity(0.1),
+                  AppTheme.accentGreen.withOpacity(0.05),
+                ]
+              : [
+                  AppTheme.primaryGreen.withOpacity(0.1),
+                  AppTheme.accentGreen.withOpacity(0.05),
+                ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppTheme.primaryGreen.withOpacity(0.2),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryGreen.withOpacity(0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.primaryGreen.withOpacity(0.2),
+                  AppTheme.accentGreen.withOpacity(0.1),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              isFarmer ? Icons.agriculture : Icons.shopping_bag,
+              color: AppTheme.primaryGreen,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isFarmer ? 'Welcome to your Farm Dashboard' : 'Welcome to your Shopping Profile',
+                  style: AppTheme.heading3.copyWith(
+                    color: AppTheme.textDark,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isFarmer 
+                      ? 'Manage your farm, track sales, and grow your business'
+                      : 'Track your orders, discover fresh produce, and support local farmers',
+                  style: AppTheme.bodyMedium.copyWith(
+                    color: AppTheme.darkGray,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   
 Widget _buildSliverAppBar(AuthProvider authProvider) {
   final user = authProvider.user;
   final profileImage = authProvider.profileImageFile;
   final profileImageUrl = authProvider.profileImageUrl;
+  final isFarmer = user?.userType == 'farmer';
   
   // Debug logging
   print('🔵 Profile screen - User: $user');
@@ -147,90 +251,190 @@ Widget _buildSliverAppBar(AuthProvider authProvider) {
   print('🔵 Profile screen - Profile image URL: $profileImageUrl');
 
   return SliverAppBar(
-    expandedHeight: 320.0,
+    expandedHeight: 260.0,
     floating: false,
     pinned: true,
-    backgroundColor: AppTheme.primaryGreen,
+    backgroundColor: isFarmer ? AppTheme.primaryGreen : AppTheme.accentGreen,
     elevation: 0,
     flexibleSpace: FlexibleSpaceBar(
       centerTitle: true,
-      titlePadding: const EdgeInsets.only(bottom: 16.0),
+      titlePadding: const EdgeInsets.only(bottom: 8.0),
       title: Text(
         user?.displayName ?? 'User Name',
-        style: AppTheme.heading3.copyWith(color: Colors.white, fontSize: 18),
+        style: AppTheme.heading3.copyWith(
+          color: Colors.white, 
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       background: Stack(
         fit: StackFit.expand,
         children: [
           Container(
-            decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
-          ),
-          // Add some decorative elements
-          Positioned(
-            top: -50,
-            right: -50,
-            child: Container(
-              width: 150,
-              height: 150,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isFarmer
+                    ? [
+                        AppTheme.primaryGreen,
+                        AppTheme.darkGreen,
+                        AppTheme.accentGreen,
+                      ]
+                    : [
+                        AppTheme.primaryGreen,
+                        AppTheme.darkGreen,
+                        AppTheme.accentGreen,
+                      ],
               ),
             ),
           ),
-          Positioned(
-            bottom: -30,
-            left: -30,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
+          // Enhanced decorative elements
+            Positioned(
+              top: -80,
+              right: -80,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.white.withOpacity(0.15),
+                      Colors.white.withOpacity(0.05),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
+            Positioned(
+              bottom: -50,
+              left: -50,
+              child: Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.white.withOpacity(0.1),
+                      Colors.white.withOpacity(0.03),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 50,
+              left: 20,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.08),
+                ),
+              ),
+            ),
           Builder(
             builder: (context) => Center(
               child: Padding(
-                padding: const EdgeInsets.only(bottom: 40.0),
+                padding: const EdgeInsets.only(bottom: 10.0),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Stack(
                       children: [
-                        GestureDetector(
-                          onTap: () => _showImageOptions(context, authProvider),
-                          child: CircleAvatar(
-                            radius: 60,
-                            backgroundColor: AppTheme.white.withOpacity(0.2),
-                            child: CircleAvatar(
-                              radius: 57,
-                              backgroundImage: profileImage != null 
-                                  ? FileImage(profileImage) 
-                                  : (profileImageUrl != null 
-                                      ? NetworkImage(profileImageUrl) as ImageProvider
-                                      : null),
-                              child: (profileImage == null && profileImageUrl == null)
-                                  ? const Icon(Icons.person, size: 65, color: AppTheme.white)
-                                  : null,
+                        // Outer ring with gradient
+                        Container(
+                          width: 130,
+                          height: 130,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.white.withOpacity(0.3),
+                                Colors.white.withOpacity(0.1),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.4),
+                              width: 3,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Profile image
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: GestureDetector(
+                            onTap: () => _showImageOptions(context, authProvider),
+                            child: Container(
+                              width: 114,
+                              height: 114,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 4,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: CircleAvatar(
+                                radius: 60,
+                                backgroundImage: profileImage != null 
+                                    ? FileImage(profileImage) 
+                                    : (profileImageUrl != null 
+                                        ? NetworkImage(profileImageUrl) as ImageProvider
+                                        : null),
+                                child: (profileImage == null && profileImageUrl == null)
+                                    ? Icon(
+                                        isFarmer ? Icons.agriculture : Icons.shopping_bag,
+                                        size: 50, 
+                                        color: Colors.white.withOpacity(0.8),
+                                      )
+                                    : null,
+                              ),
                             ),
                           ),
                         ),
+                        // Camera button
                         Positioned(
-                          bottom: 0,
-                          right: 0,
+                          bottom: 8,
+                          right: 8,
                           child: Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryGreen,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  AppTheme.primaryGreen,
+                                  AppTheme.darkGreen,
+                                ],
+                              ),
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white, width: 3),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
+                                  color: Colors.black.withOpacity(0.3),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
                                 ),
                               ],
                             ),
@@ -239,38 +443,90 @@ Widget _buildSliverAppBar(AuthProvider authProvider) {
                               child: const Icon(
                                 Icons.camera_alt,
                                 color: Colors.white,
-                                size: 18,
+                                size: 16,
                               ),
+                            ),
+                          ),
+                        ),
+                        // Status indicator
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: isFarmer ? Colors.orange : Colors.blue,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              isFarmer ? Icons.agriculture : Icons.shopping_cart,
+                              color: Colors.white,
+                              size: 14,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      user?.displayName ?? 'User Name',
-                      style: AppTheme.heading2.copyWith(color: Colors.white),
-                    ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 20),
                     Text(
                       user?.email ?? 'user@email.com',
-                      style: AppTheme.bodyMedium.copyWith(color: Colors.white.withOpacity(0.8)),
-                    ),
-                    const SizedBox(height: 8),
-                    // User type badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withOpacity(0.3)),
+                      style: AppTheme.bodyMedium.copyWith(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 15,
                       ),
-                      child: Text(
-                        user?.userType == 'farmer' ? '🌱 Farmer' : '🛒 Consumer',
-                        style: AppTheme.caption.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
+                    ),
+                    const SizedBox(height: 12),
+                    // Enhanced user type badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.white.withOpacity(0.25),
+                            Colors.white.withOpacity(0.15),
+                          ],
                         ),
+                        borderRadius: BorderRadius.circular(25),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.4),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isFarmer ? Icons.agriculture : Icons.shopping_bag,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isFarmer ? 'Farmer' : 'Consumer',
+                            style: AppTheme.bodyMedium.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -408,73 +664,138 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
   Widget _buildFarmerStats(BuildContext context, AuthProvider authProvider) {
     final user = authProvider.user!;
     
+    // Ensure controller is initialized
+    if (_farmerStatsController == null) {
+      _farmerStatsController = PageController(viewportFraction: 0.85);
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ProfileSectionHeader(
+        ModernProfileSectionHeader(
           title: 'Farm Statistics',
           subtitle: 'Your farming journey at a glance',
+          isFarmer: true,
         ),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          childAspectRatio: 1.2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          children: [
-            ProfileStatsCard(
-              title: 'Active Listings',
-              value: '${user.totalListings ?? 0}',
-              icon: Icons.storefront,
-              color: AppTheme.primaryGreen,
-            ),
-            ProfileStatsCard(
-              title: 'Total Sales',
-              value: '${user.totalSales ?? 0}',
-              icon: Icons.shopping_cart,
-              color: AppTheme.accentGreen,
-            ),
-            ProfileStatsCard(
-              title: 'Farm Size',
-              value: user.farmSize ?? 'N/A',
-              icon: Icons.landscape,
-              color: Colors.orange,
-            ),
-            ProfileStatsCard(
-              title: 'Experience',
-              value: user.farmingExperience ?? 'N/A',
-              icon: Icons.timeline,
-              color: Colors.blue,
-            ),
-          ],
+        SizedBox(
+          height: 320,
+          child: Column(
+            children: [
+              Expanded(
+                child: PageView.builder(
+                  controller: _farmerStatsController!,
+                  itemCount: 4,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _farmerCurrentPage = index;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    final stats = [
+                      {
+                        'title': 'Active Listings',
+                        'value': '${user.totalListings ?? 0}',
+                        'icon': Icons.storefront,
+                        'color': AppTheme.primaryGreen,
+                      },
+                      {
+                        'title': 'Total Sales',
+                        'value': '${user.totalSales ?? 0}',
+                        'icon': Icons.shopping_cart,
+                        'color': AppTheme.accentGreen,
+                      },
+                      {
+                        'title': 'Farm Size',
+                        'value': user.farmSize ?? 'N/A',
+                        'icon': Icons.landscape,
+                        'color': AppTheme.primaryGreen,
+                      },
+                      {
+                        'title': 'Farming Experience',
+                        'value': user.farmingExperience ?? 'N/A',
+                        'icon': Icons.timeline,
+                        'color': AppTheme.accentGreen,
+                      },
+                    ];
+                    
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      child: _buildModernFarmerStatsCard(
+                        title: stats[index]['title'] as String,
+                        value: stats[index]['value'] as String,
+                        icon: stats[index]['icon'] as IconData,
+                        color: stats[index]['color'] as Color,
+                        index: index,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Page indicator
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(4, (index) {
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: index == _farmerCurrentPage 
+                          ? AppTheme.primaryGreen 
+                          : AppTheme.primaryGreen.withOpacity(0.3),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 20),
-        // Crops Section
+        // My Products/Crops Section
         if (user.crops != null && user.crops!.isNotEmpty) ...[
-          ProfileSectionHeader(
-            title: 'Crops Grown',
-            subtitle: 'Your specialty crops',
+          ModernProfileSectionHeader(
+            title: 'My Farm Products',
+            subtitle: 'Crops you cultivate',
+            isFarmer: true,
           ),
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppTheme.white,
-              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white,
+                  AppTheme.lightGreen.withOpacity(0.3),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppTheme.primaryGreen.withOpacity(0.2),
+                width: 1.5,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: AppTheme.primaryGreen.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.8),
                   blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  offset: const Offset(0, -4),
                 ),
               ],
             ),
             child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: user.crops!.map((crop) => ProfileChip(
-                label: crop,
+              spacing: 12,
+              runSpacing: 12,
+              children: user.crops!.map((crop) => ModernCropTag(
+                crop: crop,
                 icon: Icons.eco,
+                isFarmer: true,
               )).toList(),
             ),
           ),
@@ -496,77 +817,144 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
   Widget _buildConsumerStats(BuildContext context, AuthProvider authProvider) {
     final user = authProvider.user!;
     
+    // Ensure controller is initialized
+    if (_consumerStatsController == null) {
+      _consumerStatsController = PageController(viewportFraction: 0.85);
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ProfileSectionHeader(
+        ModernProfileSectionHeader(
           title: 'Shopping Statistics',
           subtitle: 'Your shopping journey',
+          isFarmer: false,
         ),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          childAspectRatio: 1.2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          children: [
-            ProfileStatsCard(
-              title: 'Total Orders',
-              value: '${user.totalOrders ?? 0}',
-              icon: Icons.shopping_bag,
-              color: AppTheme.primaryGreen,
-            ),
-            ProfileStatsCard(
-              title: 'Total Spent',
-              value: 'Rs. ${user.totalSpent?.toStringAsFixed(0) ?? '0'}',
-              icon: Icons.account_balance_wallet,
-              color: AppTheme.accentGreen,
-            ),
-            ProfileStatsCard(
-              title: 'Member Since',
-              value: user.joinDate != null 
-                  ? '${DateTime.now().difference(user.joinDate!).inDays ~/ 30} months'
-                  : 'N/A',
-              icon: Icons.calendar_today,
-              color: Colors.orange,
-            ),
-            ProfileStatsCard(
-              title: 'Avg. Order',
-              value: user.totalOrders != null && user.totalOrders! > 0
-                  ? 'Rs. ${(user.totalSpent! / user.totalOrders!).toStringAsFixed(0)}'
-                  : 'Rs. 0',
-              icon: Icons.trending_up,
-              color: Colors.blue,
-            ),
-          ],
+        SizedBox(
+          height: 320,
+          child: Column(
+            children: [
+              Expanded(
+                child: PageView.builder(
+                  controller: _consumerStatsController!,
+                  itemCount: 4,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _consumerCurrentPage = index;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    final stats = [
+                      {
+                        'title': 'Orders Placed',
+                        'value': '${user.totalOrders ?? 0}',
+                        'icon': Icons.shopping_bag,
+                        'color': AppTheme.primaryGreen,
+                      },
+                      {
+                        'title': 'Total Spent',
+                        'value': 'Rs. ${user.totalSpent?.toStringAsFixed(0) ?? '0'}',
+                        'icon': Icons.account_balance_wallet,
+                        'color': AppTheme.accentGreen,
+                      },
+                      {
+                        'title': 'Member Since',
+                        'value': user.joinDate != null 
+                            ? '${DateTime.now().difference(user.joinDate!).inDays ~/ 30} months'
+                            : 'N/A',
+                        'icon': Icons.calendar_today,
+                        'color': AppTheme.primaryGreen,
+                      },
+                      {
+                        'title': 'Avg. Order Value',
+                        'value': user.totalOrders != null && user.totalOrders! > 0
+                            ? 'Rs. ${(user.totalSpent! / user.totalOrders!).toStringAsFixed(0)}'
+                            : 'Rs. 0',
+                        'icon': Icons.trending_up,
+                        'color': AppTheme.accentGreen,
+                      },
+                    ];
+                    
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      child: _buildModernConsumerStatsCard(
+                        title: stats[index]['title'] as String,
+                        value: stats[index]['value'] as String,
+                        icon: stats[index]['icon'] as IconData,
+                        color: stats[index]['color'] as Color,
+                        index: index,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Page indicator
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(4, (index) {
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: index == _consumerCurrentPage 
+                          ? AppTheme.primaryGreen 
+                          : AppTheme.primaryGreen.withOpacity(0.3),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
         ),
         // Preferences
         if (user.preferences != null && user.preferences!.isNotEmpty) ...[
           const SizedBox(height: 20),
-          ProfileSectionHeader(
+          ModernProfileSectionHeader(
             title: 'Shopping Preferences',
             subtitle: 'What you love',
+            isFarmer: false,
           ),
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppTheme.white,
-              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white,
+                  AppTheme.lightGreen.withOpacity(0.3),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppTheme.primaryGreen.withOpacity(0.2),
+                width: 1.5,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: AppTheme.primaryGreen.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.8),
                   blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  offset: const Offset(0, -4),
                 ),
               ],
             ),
             child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: user.preferences!.map((pref) => ProfileChip(
-                label: pref,
+              spacing: 12,
+              runSpacing: 12,
+              children: user.preferences!.map((pref) => ModernCropTag(
+                crop: pref,
                 icon: Icons.favorite,
+                backgroundColor: AppTheme.primaryGreen.withOpacity(0.1),
+                textColor: AppTheme.darkGreen,
+                isFarmer: false,
               )).toList(),
             ),
           ),
@@ -574,29 +962,47 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
         // Favorite Crops
         if (user.favoriteCrops != null && user.favoriteCrops!.isNotEmpty) ...[
           const SizedBox(height: 20),
-          ProfileSectionHeader(
+          ModernProfileSectionHeader(
             title: 'Favorite Crops',
             subtitle: 'Your go-to produce',
+            isFarmer: false,
           ),
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppTheme.white,
-              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white,
+                  AppTheme.lightGreen.withOpacity(0.3),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppTheme.primaryGreen.withOpacity(0.2),
+                width: 1.5,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: AppTheme.primaryGreen.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.8),
                   blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  offset: const Offset(0, -4),
                 ),
               ],
             ),
             child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: user.favoriteCrops!.map((crop) => ProfileChip(
-                label: crop,
+              spacing: 12,
+              runSpacing: 12,
+              children: user.favoriteCrops!.map((crop) => ModernCropTag(
+                crop: crop,
                 icon: Icons.eco,
+                isFarmer: false,
               )).toList(),
             ),
           ),
@@ -629,11 +1035,6 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
           ),
           child: Column(
             children: [
-              ProfileInfoCard(
-                title: 'Full Name',
-                subtitle: user.displayName ?? 'Not set',
-                icon: Icons.person,
-              ),
               ProfileInfoCard(
                 title: 'Email',
                 subtitle: user.email ?? 'Not set',
@@ -723,6 +1124,7 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
                 subtitle: 'Update your name, contact info, and ${authProvider.isFarmer ? 'farm details' : 'preferences'}',
                 onTap: () => _showEditProfileDialog(context, authProvider),
               ),
+              _buildModernDivider(),
               if (authProvider.isFarmer) ...[
                 _buildSettingsTile(
                   icon: Icons.eco,
@@ -730,6 +1132,7 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
                   subtitle: 'Add or edit your crops',
                   onTap: () {},
                 ),
+                _buildModernDivider(),
               ],
               _buildSettingsTile(
                 icon: Icons.notifications_outlined,
@@ -742,19 +1145,21 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
                   );
                 },
               ),
+              _buildModernDivider(),
               _buildSettingsTile(
                 icon: Icons.security,
                 title: 'Privacy & Security',
                 subtitle: 'Manage your privacy settings',
                 onTap: () {},
               ),
+              _buildModernDivider(),
               _buildSettingsTile(
                 icon: Icons.lock_reset,
                 title: 'Reset Password',
                 subtitle: 'Change your account password',
                 onTap: () => _showPasswordResetDialog(context, authProvider),
               ),
-              const Divider(indent: 20, endIndent: 20),
+              _buildModernDivider(),
               _buildSettingsTile(
                 icon: Icons.info_outline,
                 title: 'About Green Predict',
@@ -770,7 +1175,7 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
                   );
                 },
               ),
-              const Divider(indent: 20, endIndent: 20),
+              _buildModernDivider(),
               _buildSettingsTile(
                 icon: Icons.logout,
                 title: 'Logout',
@@ -826,6 +1231,22 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
         Icons.arrow_forward_ios,
         size: 16,
         color: color ?? AppTheme.darkGray,
+      ),
+    );
+  }
+
+  Widget _buildModernDivider() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      height: 1,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.transparent,
+            AppTheme.primaryGreen.withOpacity(0.2),
+            Colors.transparent,
+          ],
+        ),
       ),
     );
   }
@@ -1185,5 +1606,183 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
         Navigator.pushReplacementNamed(context, '/login');
       }
     }
+  }
+
+  Widget _buildModernFarmerStatsCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+    required int index,
+  }) {
+    return TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 600 + (index * 100)),
+      tween: Tween(begin: 0.0, end: 1.0),
+      curve: Curves.easeOutBack,
+      builder: (context, animationValue, child) {
+        return Transform.scale(
+          scale: animationValue,
+          child: Opacity(
+            opacity: animationValue.clamp(0.0, 1.0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                    spreadRadius: 0,
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      value,
+                      style: AppTheme.heading2.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 28,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      title,
+                      style: AppTheme.bodyLarge.copyWith(
+                        color: Colors.white.withOpacity(0.9),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildModernConsumerStatsCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+    required int index,
+  }) {
+    return TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 600 + (index * 100)),
+      tween: Tween(begin: 0.0, end: 1.0),
+      curve: Curves.easeOutBack,
+      builder: (context, animationValue, child) {
+        return Transform.scale(
+          scale: animationValue,
+          child: Opacity(
+            opacity: animationValue.clamp(0.0, 1.0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                    spreadRadius: 0,
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      value,
+                      style: AppTheme.heading2.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 28,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      title,
+                      style: AppTheme.bodyLarge.copyWith(
+                        color: Colors.white.withOpacity(0.9),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }

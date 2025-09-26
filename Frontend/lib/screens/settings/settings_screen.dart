@@ -20,16 +20,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('Settings & More'),
         leading: const BackButton(),
         backgroundColor: Colors.white,
         foregroundColor: AppTheme.textDark,
         elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppTheme.primaryGreen,
+                AppTheme.accentGreen,
+              ],
+            ),
+          ),
+        ),
+        titleTextStyle: AppTheme.heading2.copyWith(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppTheme.primaryGreen,
+                    AppTheme.accentGreen,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryGreen.withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Settings & More',
+                    style: AppTheme.heading2.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Manage your account',
+                    style: AppTheme.bodyMedium.copyWith(
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             _sectionTitle('Preferences & Settings'),
             _glassCard(
               child: Column(
@@ -67,11 +122,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 children: [
                   _navTile(
-                    icon: Icons.help_outline,
-                    title: 'Help & Support',
+                    icon: Icons.person_outline,
+                    title: 'Edit Profile',
+                    subtitle: 'Update your name, contact info, and preferences',
+                    onTap: () {
+                      Navigator.pushNamed(context, '/profile');
+                    },
+                  ),
+                  _divider(),
+                  _navTile(
+                    icon: Icons.notifications_outlined,
+                    title: 'Notifications',
+                    subtitle: 'Manage your notification preferences',
                     onTap: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Support center coming soon')),
+                        const SnackBar(content: Text('Notification settings coming soon')),
+                      );
+                    },
+                  ),
+                  _divider(),
+                  _navTile(
+                    icon: Icons.security_outlined,
+                    title: 'Privacy & Security',
+                    subtitle: 'Manage your privacy settings',
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Privacy settings coming soon')),
                       );
                     },
                   ),
@@ -79,7 +155,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _navTile(
                     icon: Icons.lock_reset,
                     title: 'Reset Password',
+                    subtitle: 'Change your account password',
                     onTap: () => _showPasswordResetDialog(context),
+                  ),
+                  _divider(),
+                  _navTile(
+                    icon: Icons.info_outline,
+                    title: 'About Green Predict',
+                    subtitle: 'App version and information',
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('App info coming soon')),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -89,14 +177,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _glassCard(
               child: Consumer<AuthProvider>(
                 builder: (context, auth, _) => ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.red),
-                  title: Text('Sign Out', style: AppTheme.bodyLarge.copyWith(color: Colors.red)),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.logout, color: Colors.red, size: 20),
+                  ),
+                  title: Text('Logout', style: AppTheme.bodyLarge.copyWith(color: Colors.red, fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Sign out of your account', style: TextStyle(color: Colors.grey)),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
                   onTap: () async {
                     await auth.signOut();
                     if (mounted) {
                       Navigator.pushReplacementNamed(context, '/login');
                     }
                   },
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 ),
               ),
             ),
@@ -152,18 +250,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _navTile({
     required IconData icon,
     required String title,
+    String? subtitle,
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, color: AppTheme.primaryGreen),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryGreen.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: AppTheme.primaryGreen, size: 20),
+      ),
       title: Text(title, style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.w600)),
+      subtitle: subtitle != null ? Text(subtitle, style: AppTheme.caption.copyWith(color: AppTheme.darkGray)) : null,
       trailing: Icon(Icons.arrow_forward_ios, size: 16, color: AppTheme.darkGray),
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     );
   }
 
-  Widget _divider() => const Divider(indent: 16, endIndent: 16);
+  Widget _divider() => Container(
+    margin: const EdgeInsets.symmetric(horizontal: 16),
+    height: 1,
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+          Colors.transparent,
+          AppTheme.primaryGreen.withOpacity(0.2),
+          Colors.transparent,
+        ],
+      ),
+    ),
+  );
 
   void _showPasswordResetDialog(BuildContext context) {
     final currentPasswordController = TextEditingController();

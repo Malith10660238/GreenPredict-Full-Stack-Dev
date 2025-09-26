@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   // FastAPI backend URL
-  static const String baseUrl = 'http://10.224.79.220:8001'; // FastAPI backend
+  static const String baseUrl = 'http://10.0.2.2:8001'; // FastAPI backend (Android emulator)
   
   // API Endpoints
   static const String _authEndpoint = '/auth';

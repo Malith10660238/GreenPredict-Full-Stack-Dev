@@ -1092,63 +1092,96 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         
         const SizedBox(height: 24),
         
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          childAspectRatio: 0.85,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          children: [
-            _buildModernFeatureCard(
-              icon: Icons.psychology_alt,
-              title: 'AI Intelligence',
-              description: 'Smart predictions & insights',
-              color: const Color(0xFF8B5CF6),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+        SizedBox(
+          height: 320,
+          child: Column(
+            children: [
+              Expanded(
+                child: PageView.builder(
+                  controller: PageController(viewportFraction: 0.9),
+                  itemCount: 4,
+                  itemBuilder: (context, index) {
+              final features = [
+                {
+                  'icon': Icons.psychology_alt,
+                  'title': 'AI Intelligence',
+                  'description': 'Smart predictions & insights',
+                  'color': const Color(0xFF8B5CF6),
+                  'gradient': const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+                  ),
+                },
+                {
+                  'icon': Icons.eco,
+                  'title': 'Sustainability',
+                  'description': 'Eco-friendly farming',
+                  'color': const Color(0xFF10B981),
+                  'gradient': const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF10B981), Color(0xFF059669)],
+                  ),
+                },
+                {
+                  'icon': Icons.storefront,
+                  'title': 'Direct Market',
+                  'description': 'No middlemen',
+                  'color': const Color(0xFFF59E0B),
+                  'gradient': const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                  ),
+                },
+                {
+                  'icon': Icons.verified_user,
+                  'title': 'Quality Assured',
+                  'description': 'Premium products',
+                  'color': const Color(0xFF06B6D4),
+                  'gradient': const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF06B6D4), Color(0xFF0891B2)],
+                  ),
+                },
+              ];
+              
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                child: _buildModernFeatureCard(
+                  icon: features[index]['icon'] as IconData,
+                  title: features[index]['title'] as String,
+                  description: features[index]['description'] as String,
+                  color: features[index]['color'] as Color,
+                  gradient: features[index]['gradient'] as LinearGradient,
+                  index: index,
+                ),
+              );
+                  },
+                ),
               ),
-              index: 0,
-            ),
-            _buildModernFeatureCard(
-              icon: Icons.eco,
-              title: 'Sustainability',
-              description: 'Eco-friendly farming',
-              color: const Color(0xFF10B981),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF10B981), Color(0xFF059669)],
+              const SizedBox(height: 16),
+              // Page indicator
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(4, (index) {
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: index == 0 
+                          ? AppTheme.primaryGreen 
+                          : AppTheme.primaryGreen.withOpacity(0.3),
+                    ),
+                  );
+                }),
               ),
-              index: 1,
-            ),
-            _buildModernFeatureCard(
-              icon: Icons.storefront,
-              title: 'Direct Market',
-              description: 'No middlemen',
-              color: const Color(0xFFF59E0B),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
-              ),
-              index: 2,
-            ),
-            _buildModernFeatureCard(
-              icon: Icons.verified_user,
-              title: 'Quality Assured',
-              description: 'Premium products',
-              color: const Color(0xFF06B6D4),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF06B6D4), Color(0xFF0891B2)],
-              ),
-              index: 3,
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
