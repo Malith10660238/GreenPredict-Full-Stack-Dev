@@ -132,7 +132,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             detail="Invalid authentication credentials"
         )
 
-@app.get("/")
+@app.get("/", tags=["Core"])
 async def root():
     """Root endpoint"""
     return {
@@ -141,12 +141,12 @@ async def root():
         "status": "running"
     }
 
-@app.get("/ping")
+@app.get("/ping", tags=["Core"])
 async def ping():
     """Lightweight ping endpoint"""
     return {"pong": True}
 
-@app.get("/health")
+@app.get("/health", tags=["Core"])
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "GreenPredict Backend (Firebase)"}
@@ -156,7 +156,7 @@ app.include_router(prediction_router, prefix="/predictions", tags=["predictions"
 
 # ==================== AUTHENTICATION ENDPOINTS ====================
 
-@app.post("/auth/register")
+@app.post("/auth/register", tags=["Authentication"])
 async def register(register_data: dict):
     """User registration with Firebase Auth and Firestore storage"""
     try:
@@ -299,7 +299,7 @@ async def register(register_data: dict):
             detail=f"Registration failed: {str(e)}"
         )
 
-@app.post("/auth/login")
+@app.post("/auth/login", tags=["Authentication"])
 async def login(login_data: dict):
     """User login with password verification"""
     try:
@@ -394,12 +394,12 @@ async def login(login_data: dict):
 
 # ==================== USER PROFILE ENDPOINTS ====================
 
-@app.get("/profile/")
+@app.get("/profile/", tags=["User Profiles"])
 async def get_profile(current_user: dict = Depends(get_current_user)):
     """Get user profile from Firebase"""
     return current_user
 
-@app.put("/profile/")
+@app.put("/profile/", tags=["User Profiles"])
 async def update_profile(profile_data: dict, current_user: dict = Depends(get_current_user)):
     """Update user profile in Firebase"""
     try:
@@ -495,7 +495,7 @@ async def update_profile(profile_data: dict, current_user: dict = Depends(get_cu
 
 # ==================== MARKETPLACE LISTINGS ENDPOINTS ====================
 
-@app.get("/listings/")
+@app.get("/listings/", tags=["Marketplace"])
 async def get_listings(
     crop_type: Optional[str] = Query(None),
     location: Optional[str] = Query(None),
@@ -537,7 +537,7 @@ async def get_listings(
             detail=f"Failed to fetch listings: {str(e)}"
         )
 
-@app.post("/listings/")
+@app.post("/listings/", tags=["Marketplace"])
 async def create_listing(listing_data: dict, current_user: dict = Depends(get_current_user)):
     """Create a new marketplace listing in Firebase"""
     try:
@@ -638,7 +638,7 @@ async def create_listing(listing_data: dict, current_user: dict = Depends(get_cu
             detail=f"Failed to create listing: {str(e)}"
         )
 
-@app.get("/listings/my")
+@app.get("/listings/my", tags=["Marketplace"])
 async def get_my_listings(current_user: dict = Depends(get_current_user)):
     """Get current user's listings from Firebase"""
     try:
@@ -668,7 +668,7 @@ async def get_my_listings(current_user: dict = Depends(get_current_user)):
             detail=f"Failed to fetch user listings: {str(e)}"
         )
 
-@app.put("/listings/{listing_id}")
+@app.put("/listings/{listing_id}", tags=["Marketplace"])
 async def update_listing(listing_id: str, listing_data: dict, current_user: dict = Depends(get_current_user)):
     """Update a listing in Firebase"""
     try:
@@ -718,7 +718,7 @@ async def update_listing(listing_id: str, listing_data: dict, current_user: dict
             detail=f"Failed to update listing: {str(e)}"
         )
 
-@app.delete("/listings/{listing_id}")
+@app.delete("/listings/{listing_id}", tags=["Marketplace"])
 async def delete_listing(listing_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a listing from Firebase"""
     try:
@@ -766,19 +766,19 @@ async def delete_listing(listing_id: str, current_user: dict = Depends(get_curre
 
 # ==================== INQUIRY ENDPOINTS ====================
 
-@app.get("/test-inquiries")
+@app.get("/test-inquiries", tags=["Inquiries"])
 async def test_inquiries():
     """Test endpoint to verify server is working"""
     return {"message": "Inquiry endpoints are available", "status": "working"}
 
-@app.post("/test-create-inquiry")
+@app.post("/test-create-inquiry", tags=["Inquiries"])
 async def test_create_inquiry(inquiry_data: dict, current_user: dict = Depends(get_current_user)):
     """Test endpoint to create inquiry"""
     print(f"🔵 TEST Inquiry endpoint hit! Data: {inquiry_data}")
     print(f"🔵 TEST Current user: {current_user}")
     return {"message": "Test inquiry created", "id": "test_123"}
 
-@app.post("/api/inquiries")
+@app.post("/api/inquiries", tags=["Inquiries"])
 async def create_inquiry(inquiry_data: dict, current_user: dict = Depends(get_current_user)):
     """Create a new inquiry from consumer to farmer"""
     print(f"🔵 Inquiry endpoint hit! Data: {inquiry_data}")
@@ -853,7 +853,7 @@ async def create_inquiry(inquiry_data: dict, current_user: dict = Depends(get_cu
             detail=f"Failed to create inquiry: {str(e)}"
         )
 
-@app.get("/api/inquiries/farmer")
+@app.get("/api/inquiries/farmer", tags=["Inquiries"])
 async def get_farmer_inquiries(current_user: dict = Depends(get_current_user)):
     """Get all inquiries for a farmer"""
     try:
@@ -874,7 +874,7 @@ async def get_farmer_inquiries(current_user: dict = Depends(get_current_user)):
             detail=f"Failed to fetch inquiries: {str(e)}"
         )
 
-@app.get("/api/inquiries/consumer")
+@app.get("/api/inquiries/consumer", tags=["Inquiries"])
 async def get_consumer_messages(current_user: dict = Depends(get_current_user)):
     """Get all messages sent by a consumer"""
     try:
@@ -895,7 +895,7 @@ async def get_consumer_messages(current_user: dict = Depends(get_current_user)):
             detail=f"Failed to fetch messages: {str(e)}"
         )
 
-@app.get("/api/inquiries/{inquiry_id}")
+@app.get("/api/inquiries/{inquiry_id}", tags=["Inquiries"])
 async def get_inquiry_details(inquiry_id: str, current_user: dict = Depends(get_current_user)):
     """Get specific inquiry details"""
     try:
@@ -929,7 +929,7 @@ async def get_inquiry_details(inquiry_id: str, current_user: dict = Depends(get_
             detail=f"Failed to fetch inquiry: {str(e)}"
         )
 
-@app.post("/api/inquiries/{inquiry_id}/messages")
+@app.post("/api/inquiries/{inquiry_id}/messages", tags=["Inquiries"])
 async def send_inquiry_message(inquiry_id: str, message_data: dict, current_user: dict = Depends(get_current_user)):
     """Send a message in an inquiry"""
     try:
@@ -988,7 +988,7 @@ async def send_inquiry_message(inquiry_id: str, message_data: dict, current_user
             detail=f"Failed to send message: {str(e)}"
         )
 
-@app.put("/api/inquiries/{inquiry_id}/status")
+@app.put("/api/inquiries/{inquiry_id}/status", tags=["Inquiries"])
 async def update_inquiry_status(inquiry_id: str, status_data: dict, current_user: dict = Depends(get_current_user)):
     """Update inquiry status (farmer only)"""
     try:
@@ -1036,7 +1036,7 @@ async def update_inquiry_status(inquiry_id: str, status_data: dict, current_user
             detail=f"Failed to update inquiry status: {str(e)}"
         )
 
-@app.put("/api/inquiries/{inquiry_id}/hide")
+@app.put("/api/inquiries/{inquiry_id}/hide", tags=["Inquiries"])
 async def hide_inquiry(inquiry_id: str, hide_data: dict, current_user: dict = Depends(get_current_user)):
     """Hide/unhide an inquiry"""
     try:
@@ -1082,7 +1082,7 @@ async def hide_inquiry(inquiry_id: str, hide_data: dict, current_user: dict = De
             detail=f"Failed to hide inquiry: {str(e)}"
         )
 
-@app.get("/api/inquiries/hidden")
+@app.get("/api/inquiries/hidden", tags=["Inquiries"])
 async def get_hidden_inquiries(current_user: dict = Depends(get_current_user)):
     """Get hidden inquiries for current user"""
     try:
@@ -1103,7 +1103,7 @@ async def get_hidden_inquiries(current_user: dict = Depends(get_current_user)):
             detail=f"Failed to fetch hidden inquiries: {str(e)}"
         )
 
-@app.delete("/api/inquiries/{inquiry_id}/messages/{message_id}")
+@app.delete("/api/inquiries/{inquiry_id}/messages/{message_id}", tags=["Inquiries"])
 async def delete_message(inquiry_id: str, message_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a specific message (only own messages)"""
     try:
@@ -1162,7 +1162,7 @@ async def delete_message(inquiry_id: str, message_id: str, current_user: dict = 
             detail=f"Failed to delete message: {str(e)}"
         )
 
-@app.delete("/api/inquiries/{inquiry_id}")
+@app.delete("/api/inquiries/{inquiry_id}", tags=["Inquiries"])
 async def delete_inquiry(inquiry_id: str, current_user: dict = Depends(get_current_user)):
     """Delete an entire inquiry/conversation (only by consumer)"""
     try:

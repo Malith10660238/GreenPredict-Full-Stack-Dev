@@ -689,35 +689,49 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildChatButton(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      child: ElevatedButton(
-        onPressed: () => _handleChatWithFarmer(context),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.primaryGreen,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 2,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              'Chat with Farmer',
-              style: AppTheme.bodyLarge.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        // Don't show chat button if:
+        // 1. User is not authenticated
+        // 2. User is a farmer (farmers can't chat with other farmers)
+        // 3. User is viewing their own listing
+        if (!authProvider.isAuthenticated || 
+            authProvider.isFarmer || 
+            authProvider.user?.uid == widget.listing['farmerId']) {
+          return const SizedBox.shrink(); // Return empty widget to hide button
+        }
+
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          child: ElevatedButton(
+            onPressed: () => _handleChatWithFarmer(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryGreen,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
+              elevation: 2,
             ),
-          ],
-        ),
-      ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Chat with Farmer',
+                  style: AppTheme.bodyLarge.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
