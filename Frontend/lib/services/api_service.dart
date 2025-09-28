@@ -410,6 +410,12 @@ Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
         print('🔵 API Service: Raw response body: ${response.body}');
         print('🔵 API Service: Parsed result: $result');
         print('🔵 API Service: Result length: ${result.length}');
+        
+        // Debug: Print each prediction
+        for (int i = 0; i < result.length; i++) {
+          print('🔵 API Service: Prediction $i: ${result[i]}');
+        }
+        
         return List<Map<String, dynamic>>.from(result);
       } else {
         print('❌ History fetch failed - Status: ${response.statusCode}, Body: ${response.body}');

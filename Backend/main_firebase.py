@@ -94,16 +94,18 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
                 farmer_doc = db.collection('farmers').document(uid).get()
                 if farmer_doc.exists:
                     farmer_data = farmer_doc.to_dict()
-                    # Merge farmer-specific data
+                    # Merge farmer-specific data - use top-level fields (not nested farmerProfile)
                     user_data['farmerProfile'] = {
                         'farmName': farmer_data.get('farmName'),
                         'farmSize': farmer_data.get('farmSize'),
-                        'crops': farmer_data.get('crops', []),
+                        'crops': farmer_data.get('crops', []),  # Use top-level crops field
                         'farmingExperience': farmer_data.get('farmingExperience'),
                         'totalListings': farmer_data.get('totalListings'),
                         'totalSales': farmer_data.get('totalSales'),
                         'certification': farmer_data.get('certification')
                     }
+                    print(f"🔍 Farmer data from farmers collection: {farmer_data}")
+                    print(f"🔍 Crops from farmers collection: {farmer_data.get('crops', [])}")
             elif user_type == 'consumer':
                 consumer_doc = db.collection('consumers').document(uid).get()
                 if consumer_doc.exists:
@@ -403,6 +405,17 @@ async def get_profile(current_user: dict = Depends(get_current_user)):
 async def update_profile(profile_data: dict, current_user: dict = Depends(get_current_user)):
     """Update user profile in Firebase"""
     try:
+        print(f"🔍 Profile update request from user: {current_user.get('displayName', 'Unknown')}")
+        print(f"📝 Profile update data: {profile_data}")
+        print(f"🔍 Profile data keys: {list(profile_data.keys())}")
+        if 'consumerProfile' in profile_data:
+            print(f"🔍 Consumer profile data: {profile_data['consumerProfile']}")
+            if 'preferences' in profile_data['consumerProfile']:
+                print(f"🔍 Preferences being sent: {profile_data['consumerProfile']['preferences']}")
+        if 'farmerProfile' in profile_data:
+            print(f"🔍 Farmer profile data: {profile_data['farmerProfile']}")
+            if 'crops' in profile_data['farmerProfile']:
+                print(f"🔍 Crops being sent: {profile_data['farmerProfile']['crops']}")
         uid = current_user['uid']
         
         # Update user data
@@ -423,21 +436,37 @@ async def update_profile(profile_data: dict, current_user: dict = Depends(get_cu
         
         # Update user-specific profiles
         user_type = current_user.get("userType", "farmer")
+        print(f"🔍 User type: {user_type}")
         if user_type == "farmer":
             farmer_profile = current_user.get("farmerProfile", {})
-            for field in ["farmName", "farmSize", "farmingExperience", "certification"]:
-                if field in profile_data:
-                    farmer_profile[field] = profile_data[field]
+            # Check if farmerProfile is in the request data
+            if "farmerProfile" in profile_data:
+                print(f"🔍 Processing farmerProfile from request: {profile_data['farmerProfile']}")
+                # Update farmer profile with data from request
+                for field in ["farmName", "farmSize", "farmingExperience", "certification", "crops"]:
+                    if field in profile_data["farmerProfile"]:
+                        farmer_profile[field] = profile_data["farmerProfile"][field]
+                        print(f"🔍 Updated farmer field {field}: {profile_data['farmerProfile'][field]}")
             update_data["farmerProfile"] = farmer_profile
         else:
             consumer_profile = current_user.get("consumerProfile", {})
-            if "preferences" in profile_data:
-                consumer_profile["preferences"] = profile_data["preferences"]
+            print(f"🔍 Current consumer profile: {consumer_profile}")
+            if "consumerProfile" in profile_data:
+                print(f"🔍 Updating consumer profile with: {profile_data['consumerProfile']}")
+                # Replace the entire consumer profile, don't merge
+                consumer_profile = profile_data["consumerProfile"]
             update_data["consumerProfile"] = consumer_profile
+            print(f"🔍 Final consumer profile: {consumer_profile}")
         
         # Update in Firestore - users collection
+        print(f"🔍 About to update users collection with: {update_data}")
         db.collection('users').document(uid).update(update_data)
         print(f"✅ Updated user document in users collection")
+        
+        # Verify the update by reading back the document
+        updated_doc = db.collection('users').document(uid).get()
+        updated_data = updated_doc.to_dict()
+        print(f"🔍 Verification - Updated document consumerProfile: {updated_data.get('consumerProfile', {})}")
         
         # Also update the type-specific collection (farmers or consumers)
         user_type = current_user.get("userType", "farmer")
@@ -452,12 +481,31 @@ async def update_profile(profile_data: dict, current_user: dict = Depends(get_cu
                 "bio": update_data.get("bio"),
                 "updatedAt": update_data.get("updatedAt")
             }
+            
+            # Update crops field directly in farmers collection
+            print(f"🔍 Checking for farmerProfile in update_data: {'farmerProfile' in update_data}")
+            if "farmerProfile" in update_data:
+                print(f"🔍 farmerProfile content: {update_data['farmerProfile']}")
+                print(f"🔍 Checking for crops in farmerProfile: {'crops' in update_data['farmerProfile']}")
+                if "crops" in update_data["farmerProfile"]:
+                    crops = update_data["farmerProfile"]["crops"]
+                    farmer_update_data["crops"] = crops
+                    print(f"🔍 Adding crops to farmers collection: {crops}")
+                else:
+                    print("🔍 No crops field found in farmerProfile")
+            else:
+                print("🔍 No farmerProfile found in update_data")
             # Remove None values
             farmer_update_data = {k: v for k, v in farmer_update_data.items() if v is not None}
             
             if farmer_update_data:
                 db.collection('farmers').document(uid).update(farmer_update_data)
                 print(f"✅ Updated farmer document in farmers collection")
+                
+                # Verify the update by reading back the document
+                updated_farmer_doc = db.collection('farmers').document(uid).get()
+                updated_farmer_data = updated_farmer_doc.to_dict()
+                print(f"🔍 Verification - Updated farmer crops: {updated_farmer_data.get('crops', [])}")
                 
         elif user_type == "consumer":
             # Update consumers collection
@@ -470,8 +518,15 @@ async def update_profile(profile_data: dict, current_user: dict = Depends(get_cu
                 "bio": update_data.get("bio"),
                 "updatedAt": update_data.get("updatedAt")
             }
+            
+            # Also update consumer profile data (including preferences)
+            if "consumerProfile" in update_data:
+                consumer_update_data["consumerProfile"] = update_data["consumerProfile"]
+                print(f"🔍 Adding consumerProfile to consumers collection: {update_data['consumerProfile']}")
+            
             # Remove None values
             consumer_update_data = {k: v for k, v in consumer_update_data.items() if v is not None}
+            print(f"🔍 Final consumer update data: {consumer_update_data}")
             
             if consumer_update_data:
                 db.collection('consumers').document(uid).update(consumer_update_data)
@@ -481,6 +536,17 @@ async def update_profile(profile_data: dict, current_user: dict = Depends(get_cu
         updated_doc = db.collection('users').document(uid).get()
         updated_user = updated_doc.to_dict()
         updated_user['uid'] = uid
+        
+        # Also get updated farmer data if user is farmer
+        if user_type == "farmer":
+            farmer_doc = db.collection('farmers').document(uid).get()
+            if farmer_doc.exists:
+                farmer_data = farmer_doc.to_dict()
+                # Get existing farmerProfile from users collection and update crops
+                existing_farmer_profile = updated_user.get('farmerProfile', {})
+                existing_farmer_profile['crops'] = farmer_data.get('crops', [])
+                updated_user['farmerProfile'] = existing_farmer_profile
+                print(f"🔍 Response - Updated crops: {farmer_data.get('crops', [])}")
         
         return {
             "message": "Profile updated successfully",

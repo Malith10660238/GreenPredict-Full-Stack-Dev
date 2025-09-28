@@ -67,7 +67,7 @@ async def test_analyze_crop_prediction(prediction_data: PredictionRequest):
                 'result': prediction_result.dict(),
                 'created_at': datetime.now()
             }
-            db.collection('predictions').document(prediction_id).set(prediction_doc)
+            db.collection('crop_predictions_ai').document(prediction_id).set(prediction_doc)
         except Exception as e:
             print(f"Warning: Could not save to Firestore: {e}")
         
@@ -110,7 +110,7 @@ async def analyze_crop_prediction(
         # Generate AI prediction result using the trained model
         prediction_result = generate_ai_prediction(input_params)
         
-        # Save prediction to Firestore in crop_predictions_ai collection
+        # Save prediction to Firestore in predictions collection
         from datetime import timezone
         current_time = datetime.now(timezone.utc)
         print(f"🔵 Backend: Setting createdAt to: {current_time}")
@@ -121,7 +121,8 @@ async def analyze_crop_prediction(
             'location': input_params.location,
             'predictedYield': prediction_result.yield_profitability_analysis.expected_yield,
             'confidence': prediction_result.current_season_recommendation.suitability_score / 100,
-            'createdAt': current_time,
+            'created_at': current_time,  # Use snake_case consistently
+            'createdAt': current_time,   # Keep both for compatibility
             'input_parameters': input_params.dict(),
             'ai_analysis': {
                 'input_parameters': {
@@ -192,37 +193,47 @@ async def get_prediction_history(
     limit: int = 10,
     offset: int = 0
 ):
-    """Get user's prediction history from crop_predictions_ai collection"""
+    """Get user's prediction history from predictions collection"""
     try:
         print(f"🔵 Backend: Getting prediction history for user: {current_user['uid']}")
+        print(f"🔵 Backend: User type: {type(current_user['uid'])}")
         db = firestore.client()
         
-        # Query user's predictions from crop_predictions_ai collection
-        # Note: This query requires a composite index on (user_id, createdAt)
+        # Query user's predictions from predictions collection
+        # Note: This query requires a composite index on (user_id, created_at)
         # Create index at: https://console.firebase.google.com/v1/r/project/green-predict/firestore/indexes
         
         # Use fallback query to avoid composite index requirement
         # Get all user predictions and sort manually in Python
         print("🔵 Backend: Using fallback query to avoid composite index requirement")
+        print(f"🔵 Backend: Querying predictions collection with user_id: {current_user['uid']}")
         predictions_query = (
             db.collection('crop_predictions_ai')
             .where('user_id', '==', current_user['uid'])
-            .limit(50)  # Get more to account for manual sorting
+            .limit(500)  # Increased limit to get more predictions
         )
         
         predictions = predictions_query.stream()
         
         prediction_history = []
         prediction_count = 0
+        print(f"🔵 Backend: Starting to process predictions...")
         for pred in predictions:
             prediction_count += 1
             print(f"🔵 Backend: Processing prediction {prediction_count}: {pred.id}")
             pred_data = pred.to_dict()
+            print(f"🔵 Backend: Raw prediction data: {pred_data}")
+            print(f"🔵 Backend: User ID in document: {pred_data.get('user_id')}")
+            print(f"🔵 Backend: Expected user ID: {current_user['uid']}")
+            print(f"🔵 Backend: User IDs match: {pred_data.get('user_id') == current_user['uid']}")
             # Convert Firestore timestamp to ISO string format
-            created_at = pred_data.get('createdAt')
-            print(f"🔵 Backend: Raw createdAt from Firestore: {created_at} (type: {type(created_at)})")
+            created_at = pred_data.get('created_at') or pred_data.get('createdAt')
+            print(f"🔵 Backend: Raw created_at from Firestore: {created_at} (type: {type(created_at)})")
             
-            if hasattr(created_at, 'timestamp'):
+            if created_at is None:
+                print("🔵 Backend: No created_at field found, using current time")
+                created_at = datetime.now().isoformat()
+            elif hasattr(created_at, 'timestamp'):
                 created_at = datetime.fromtimestamp(created_at.timestamp()).isoformat()
                 print(f"🔵 Backend: Converted Firestore timestamp to: {created_at}")
             elif isinstance(created_at, datetime):
@@ -234,25 +245,92 @@ async def get_prediction_history(
                 pass
             else:
                 # Convert to ISO string format
-                created_at = created_at.isoformat() if created_at else None
+                created_at = created_at.isoformat() if created_at else datetime.now().isoformat()
                 print(f"🔵 Backend: Converted other type to ISO: {created_at}")
+            
+            # Map fields from predictions collection structure
+            input_params = pred_data.get('input_parameters', {})
+            ai_analysis = pred_data.get('ai_analysis', {})
+            
+            # Debug: Print the actual structure
+            print(f"🔵 Backend: Raw pred_data keys: {list(pred_data.keys())}")
+            print(f"🔵 Backend: input_params: {input_params}")
+            print(f"🔵 Backend: ai_analysis: {ai_analysis}")
+            
+            # Try to get yield and confidence from multiple possible locations
+            predicted_yield = 'N/A'
+            confidence = 0.0
+            
+            # First, check if yield and confidence are at the top level of the document
+            if 'predictedYield' in pred_data:
+                predicted_yield = pred_data.get('predictedYield', 'N/A')
+                print(f"🔵 Backend: Found predictedYield at top level: {predicted_yield}")
+            elif 'yield_analysis' in ai_analysis:
+                yield_analysis = ai_analysis.get('yield_analysis', {})
+                predicted_yield = yield_analysis.get('expected_yield', 'N/A')
+                print(f"🔵 Backend: Found expected_yield in ai_analysis.yield_analysis: {predicted_yield}")
+            elif 'yield_profitability_analysis' in ai_analysis:
+                yield_analysis = ai_analysis.get('yield_profitability_analysis', {})
+                predicted_yield = yield_analysis.get('expected_yield', 'N/A')
+                print(f"🔵 Backend: Found expected_yield in ai_analysis.yield_profitability_analysis: {predicted_yield}")
+            
+            # Check confidence at top level first
+            if 'confidence' in pred_data:
+                confidence = pred_data.get('confidence', 0.0)
+                print(f"🔵 Backend: Found confidence at top level: {confidence}")
+            elif 'current_season' in ai_analysis:
+                current_season = ai_analysis.get('current_season', {})
+                confidence = current_season.get('suitability_score', 0) / 100.0
+                print(f"🔵 Backend: Found suitability_score in ai_analysis.current_season: {confidence}")
+            elif 'current_season_recommendation' in ai_analysis:
+                current_season = ai_analysis.get('current_season_recommendation', {})
+                confidence = current_season.get('suitability_score', 0) / 100.0
+                print(f"🔵 Backend: Found suitability_score in ai_analysis.current_season_recommendation: {confidence}")
+            
+            # Extract input parameters from the saved data
+            saved_input_params = pred_data.get('input_parameters', {})
+            if not saved_input_params:
+                # Fallback to ai_analysis input_parameters
+                saved_input_params = ai_analysis.get('input_parameters', {})
+            
+            # Extract crop and location from multiple possible sources
+            crop_type = (pred_data.get('cropType') or 
+                        saved_input_params.get('crop') or 
+                        ai_analysis.get('current_season', {}).get('recommended_crop') or 
+                        'Unknown')
+            
+            location = (pred_data.get('location') or 
+                       saved_input_params.get('location') or 
+                       'Unknown')
             
             prediction_history.append({
                 'prediction_id': pred_data.get('prediction_id'),
                 'user_id': pred_data.get('user_id'),
-                'cropType': pred_data.get('cropType'),
-                'location': pred_data.get('location'),
-                'predictedYield': pred_data.get('predictedYield'),
-                'confidence': pred_data.get('confidence'),
+                'cropType': crop_type,
+                'location': location,
+                'predictedYield': predicted_yield,
+                'confidence': confidence,
                 'createdAt': created_at,
-                'ai_analysis': pred_data.get('ai_analysis', {})
+                'created_at': created_at,  # Include both formats for compatibility
+                'input_parameters': saved_input_params,
+                'ai_analysis': ai_analysis  # Include the full AI analysis data
             })
+        
+        print(f"🔵 Backend: Total predictions found in Firebase: {prediction_count}")
+        print(f"🔵 Backend: Predictions processed: {len(prediction_history)}")
+        
+        # Debug: Print all prediction IDs found
+        for i, pred in enumerate(prediction_history):
+            print(f"🔵 Backend: Prediction {i+1}: ID={pred.get('prediction_id')}, CreatedAt={pred.get('createdAt')}")
         
         # Manual sorting for fallback query (no composite index)
         print(f"🔵 Backend: Sorting {len(prediction_history)} predictions manually")
         if len(prediction_history) > 1:
             # Sort by createdAt in descending order (newest first)
             prediction_history.sort(key=lambda x: x.get('createdAt', datetime.min), reverse=True)
+            print(f"🔵 Backend: After sorting, first few predictions:")
+            for i, pred in enumerate(prediction_history[:3]):
+                print(f"  {i+1}: ID={pred.get('prediction_id')}, CreatedAt={pred.get('createdAt')}")
         
         # Apply limit and offset manually
         print(f"🔵 Backend: Applying limit={limit}, offset={offset}")
@@ -262,6 +340,9 @@ async def get_prediction_history(
             prediction_history = []
         
         print(f"🔵 Backend: Returning {len(prediction_history)} predictions to frontend")
+        print(f"🔵 Backend: Final response structure:")
+        for i, pred in enumerate(prediction_history):
+            print(f"  Prediction {i+1}: {pred}")
         return prediction_history
         
     except Exception as e:
@@ -275,7 +356,7 @@ async def get_prediction_by_id(
     prediction_id: str,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    """Get specific prediction by ID from crop_predictions_ai collection"""
+    """Get specific prediction by ID from predictions collection"""
     try:
         db = firestore.client()
         

@@ -5,6 +5,8 @@ import '../../utils/app_theme.dart';
 import '../../widgets/profile_widgets.dart';
 import '../notifications/notifications_screen.dart';
 import 'guest_profile_screen.dart';
+import 'edit_preferences_screen.dart';
+import 'edit_crops_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -753,12 +755,43 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
           ),
         ),
         const SizedBox(height: 20),
-        // My Products/Crops Section
-        if (user.crops != null && user.crops!.isNotEmpty) ...[
+        // My Crops Section - Always show for farmers
+        if (user.userType == 'farmer') ...[
+          // Debug logging
+          Builder(
+            builder: (context) {
+              print('🔵 ProfileScreen - User crops: ${user.crops}');
+              print('🔵 ProfileScreen - Crops is not null: ${user.crops != null}');
+              print('🔵 ProfileScreen - Crops is not empty: ${user.crops?.isNotEmpty ?? false}');
+              return const SizedBox.shrink();
+            },
+          ),
           ModernProfileSectionHeader(
-            title: 'My Farm Products',
+            title: 'My Crops',
             subtitle: 'Crops you cultivate',
             isFarmer: true,
+            action: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const EditCropsScreen(),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGreen.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.edit,
+                  color: AppTheme.primaryGreen,
+                  size: 18,
+                ),
+              ),
+            ),
           ),
           Container(
             padding: const EdgeInsets.all(24),
@@ -789,15 +822,40 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
                 ),
               ],
             ),
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: user.crops!.map((crop) => ModernCropTag(
-                crop: crop,
-                icon: Icons.eco,
-                isFarmer: true,
-              )).toList(),
-            ),
+            child: user.crops != null && user.crops!.isNotEmpty
+                ? Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: user.crops!.map((crop) => ModernCropTag(
+                      crop: crop,
+                      icon: Icons.eco,
+                      isFarmer: true,
+                    )).toList(),
+                  )
+                : Column(
+                    children: [
+                      Icon(
+                        Icons.eco,
+                        size: 48,
+                        color: AppTheme.primaryGreen.withOpacity(0.3),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No crops added yet',
+                        style: AppTheme.bodyLarge.copyWith(
+                          color: AppTheme.darkGray,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tap the edit button to add your crops',
+                        style: AppTheme.bodyMedium.copyWith(
+                          color: AppTheme.darkGray,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ],
         // Certification
@@ -909,13 +967,35 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
             ],
           ),
         ),
-        // Preferences
-        if (user.preferences != null && user.preferences!.isNotEmpty) ...[
+        // Preferences - Always show for consumers
+        if (user.userType == 'consumer') ...[
           const SizedBox(height: 20),
           ModernProfileSectionHeader(
             title: 'Shopping Preferences',
             subtitle: 'What you love',
             isFarmer: false,
+            action: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const EditPreferencesScreen(),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGreen.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.edit,
+                  color: AppTheme.primaryGreen,
+                  size: 18,
+                ),
+              ),
+            ),
           ),
           Container(
             padding: const EdgeInsets.all(24),
@@ -946,65 +1026,42 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
                 ),
               ],
             ),
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: user.preferences!.map((pref) => ModernCropTag(
-                crop: pref,
-                icon: Icons.favorite,
-                backgroundColor: AppTheme.primaryGreen.withOpacity(0.1),
-                textColor: AppTheme.darkGreen,
-                isFarmer: false,
-              )).toList(),
-            ),
-          ),
-        ],
-        // Favorite Crops
-        if (user.favoriteCrops != null && user.favoriteCrops!.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          ModernProfileSectionHeader(
-            title: 'Favorite Crops',
-            subtitle: 'Your go-to produce',
-            isFarmer: false,
-          ),
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white,
-                  AppTheme.lightGreen.withOpacity(0.3),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: AppTheme.primaryGreen.withOpacity(0.2),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primaryGreen.withOpacity(0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-                BoxShadow(
-                  color: Colors.white.withOpacity(0.8),
-                  blurRadius: 10,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-            ),
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: user.favoriteCrops!.map((crop) => ModernCropTag(
-                crop: crop,
-                icon: Icons.eco,
-                isFarmer: false,
-              )).toList(),
-            ),
+            child: user.preferences != null && user.preferences!.isNotEmpty
+                ? Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: user.preferences!.map((pref) => ModernCropTag(
+                      crop: pref,
+                      icon: Icons.favorite,
+                      backgroundColor: AppTheme.primaryGreen.withOpacity(0.1),
+                      textColor: AppTheme.darkGreen,
+                      isFarmer: false,
+                    )).toList(),
+                  )
+                : Column(
+                    children: [
+                      Icon(
+                        Icons.favorite_border,
+                        size: 48,
+                        color: AppTheme.primaryGreen.withOpacity(0.3),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No preferences yet',
+                        style: AppTheme.bodyLarge.copyWith(
+                          color: AppTheme.darkGray,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tap the edit button to add your preferences',
+                        style: AppTheme.bodyMedium.copyWith(
+                          color: AppTheme.darkGray,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ],
       ],

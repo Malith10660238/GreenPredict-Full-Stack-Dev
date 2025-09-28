@@ -188,6 +188,123 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // --- NEW: Method to update preferences only ---
+  Future<void> updatePreferences(List<String> preferences) async {
+    if (_user == null) {
+      _setError('User not authenticated');
+      return;
+    }
+
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      final profileData = {
+        'consumerProfile': {
+          'preferences': preferences,
+        },
+      };
+      
+      // Call the real backend API to update preferences
+      if (_authToken == null) {
+        _setError('Authentication required. Please login again.');
+        _setLoading(false);
+        return;
+      }
+      
+      print('🔵 Sending preferences update data: $profileData');
+      final response = await _apiService.updateProfile(profileData, _authToken!);
+      print('🔵 Preferences update response: $response');
+      
+      if (response['uid'] != null || response['user'] != null) {
+        // Get user data from response (handle both direct response and nested user object)
+        final userData = response['user'] ?? response;
+        
+        // Update local user data with backend response
+        _user = _user!.copyWith(
+          preferences: userData['consumerProfile']?['preferences']?.cast<String>() ?? userData['consumer_profile']?['preferences']?.cast<String>(),
+        );
+        
+        notifyListeners();
+        _setLoading(false);
+      } else {
+        _setError('Failed to update preferences');
+        _setLoading(false);
+      }
+    } catch (e) {
+      _setError('Failed to update preferences: $e');
+      _setLoading(false);
+    }
+  }
+
+  // --- NEW: Method to update crops only ---
+  Future<void> updateCrops(List<String> crops) async {
+    if (_user == null) {
+      _setError('User not authenticated');
+      return;
+    }
+
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      final profileData = {
+        'farmerProfile': {
+          'crops': crops,
+        },
+      };
+      
+      // Call the real backend API to update crops
+      if (_authToken == null) {
+        _setError('Authentication required. Please login again.');
+        _setLoading(false);
+        return;
+      }
+      
+      print('🔵 AuthProvider - User: ${_user?.displayName}');
+      print('🔵 AuthProvider - User Type: ${_user?.userType}');
+      print('🔵 AuthProvider - Auth Token exists: ${_authToken != null}');
+      
+      print('🔵 Sending crops update data: $profileData');
+      final response = await _apiService.updateProfile(profileData, _authToken!);
+      print('🔵 Crops update response: $response');
+      
+      if (response['uid'] != null || response['user'] != null) {
+        // Get user data from response (handle both direct response and nested user object)
+        final userData = response['user'] ?? response;
+        print('🔵 User data from response: $userData');
+        print('🔵 Farmer profile (camelCase) from response: ${userData['farmerProfile']}');
+        print('🔵 Farmer profile (snake_case) from response: ${userData['farmer_profile']}');
+        print('🔵 Crops from farmerProfile (camelCase): ${userData['farmerProfile']?['crops']}');
+        print('🔵 Crops from farmer_profile (snake_case): ${userData['farmer_profile']?['crops']}');
+        
+        // Update local user data with backend response
+        // Backend returns crops in farmerProfile (camelCase) with the updated crops
+        // farmer_profile (snake_case) contains old data, so prioritize farmerProfile
+        final updatedCrops = userData['farmerProfile']?['crops']?.cast<String>() ?? userData['farmer_profile']?['crops']?.cast<String>();
+        print('🔵 Updated crops: $updatedCrops');
+        print('🔵 Updated crops length: ${updatedCrops?.length}');
+        print('🔵 Updated crops is not null: ${updatedCrops != null}');
+        
+        _user = _user!.copyWith(
+          crops: updatedCrops,
+        );
+        
+        print('🔵 User after update - crops: ${_user?.crops}');
+        print('🔵 User after update - crops length: ${_user?.crops?.length}');
+        
+        notifyListeners();
+        _setLoading(false);
+      } else {
+        _setError('Failed to update crops');
+        _setLoading(false);
+      }
+    } catch (e) {
+      _setError('Failed to update crops: $e');
+      _setLoading(false);
+    }
+  }
+
   // --- ENHANCED: Method to update user details ---
   Future<void> updateUserProfile({
     required String displayName,

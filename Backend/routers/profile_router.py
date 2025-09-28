@@ -303,7 +303,7 @@ async def delete_account(current_user: Dict[str, Any] = Depends(get_current_user
             listing.reference.delete()
         
         # Delete user's predictions
-        predictions_query = db.collection('predictions').where('user_id', '==', current_user['uid'])
+        predictions_query = db.collection('crop_predictions_ai').where('user_id', '==', current_user['uid'])
         predictions = predictions_query.stream()
         for prediction in predictions:
             prediction.reference.delete()

@@ -1760,8 +1760,17 @@ class AIAnalysisReportScreen extends StatelessWidget {
         final cropType = prediction['cropType'] ?? 'Unknown Crop';
         final confidence = _safeToDouble(prediction['confidence']);
         
-        // Try to extract success probability from reasons if available
+        // Try to get suitability score from current_season data
         int suitabilityScore = (confidence * 100).round();
+        if (aiAnalysis['current_season'] != null) {
+          final currentSeason = aiAnalysis['current_season'];
+          final score = currentSeason['suitability_score'];
+          if (score != null) {
+            suitabilityScore = _safeToDouble(score).round();
+          }
+        }
+        
+        // Try to extract success probability from reasons if available
         if (aiAnalysis['current_season'] != null && aiAnalysis['current_season']['reasons'] != null) {
           final reasons = aiAnalysis['current_season']['reasons'] as List;
           for (final reason in reasons) {
@@ -1778,7 +1787,7 @@ class AIAnalysisReportScreen extends StatelessWidget {
         
         final result = {
           'suitabilityScore': suitabilityScore,
-          'reasons': ['Based on historical prediction data'],
+          'reasons': aiAnalysis['current_season']?['reasons'] ?? ['Based on historical prediction data'],
           'season': 'Current Season',
           'cropType': cropType,
         };
@@ -1812,15 +1821,16 @@ class AIAnalysisReportScreen extends StatelessWidget {
         return result;
       }
       
-      // If not found, construct from root level data
+      // If not found, construct from root level data and input_parameters
+      final inputParams = prediction['input_parameters'] ?? {};
       final result = {
-        'planning_year': prediction['planning_year'] ?? DateTime.now().year.toString(),
-        'location': prediction['location'] ?? 'Unknown',
-        'soil_type': prediction['soil_type'] ?? 'Unknown',
-        'season': prediction['season'] ?? 'Unknown',
-        'crop': prediction['cropType'] ?? 'Unknown',
-        'temperature': prediction['temperature']?.toString() ?? 'Unknown',
-        'land_area': prediction['land_area']?.toString() ?? '1.0',
+        'planning_year': inputParams['planning_year'] ?? DateTime.now().year.toString(),
+        'location': prediction['location'] ?? inputParams['location'] ?? 'Unknown',
+        'soil_type': inputParams['soil_type'] ?? 'Unknown',
+        'season': inputParams['season'] ?? 'Unknown',
+        'crop': prediction['cropType'] ?? inputParams['crop'] ?? 'Unknown',
+        'temperature': inputParams['temperature']?.toString() ?? 'Unknown',
+        'land_area': inputParams['land_area']?.toString() ?? '1.0',
       };
       print('🔵 _getInputParameters: Created result from root data = $result');
       return result;
@@ -1855,12 +1865,15 @@ class AIAnalysisReportScreen extends StatelessWidget {
       final predictedYield = prediction['predictedYield'] ?? 'Unknown';
       final confidence = prediction['confidence'] ?? 0.0;
       
+      // Try to get more detailed yield data from ai_analysis
+      final yieldAnalysis = aiAnalysis['yield_analysis'] ?? {};
+      
       final result = {
-        'expected_yield': predictedYield,
-        'estimated_costs': 'LKR 250,000', // Default value
-        'estimated_revenue': 'LKR 235,329', // Default value
-        'net_profit': 'LKR -14,671', // Default value
-        'profit_margin': '${(confidence * 100).toStringAsFixed(1)}%',
+        'expected_yield': yieldAnalysis['expected_yield'] ?? predictedYield,
+        'estimated_costs': yieldAnalysis['estimated_costs'] ?? 'LKR 250,000',
+        'estimated_revenue': yieldAnalysis['estimated_revenue'] ?? 'LKR 235,329',
+        'net_profit': yieldAnalysis['net_profit'] ?? 'LKR -14,671',
+        'profit_margin': yieldAnalysis['profit_margin'] ?? '${(confidence * 100).toStringAsFixed(1)}%',
       };
       print('🔵 _getYieldAnalysis: Created result from available data = $result');
       return result;

@@ -45,7 +45,7 @@ class _PredictionHistoryScreenState extends State<PredictionHistoryScreen> {
       final history = await apiService.getPredictionHistory(token);
       
       print('🔵 Prediction History Screen: Received ${history.length} predictions');
-      print('🔵 Prediction History Screen: History data: $history');
+      print('🔵 Prediction History Screen: First prediction data: ${history.isNotEmpty ? history[0] : 'No predictions'}');
       
       setState(() {
         predictions = history;
@@ -377,10 +377,16 @@ class _PredictionHistoryScreenState extends State<PredictionHistoryScreen> {
       print('🔵 Created time (UTC): $dateUtc');
     }
     
+    print('🔵 Available fields in prediction: ${prediction.keys.toList()}');
+    print('🔵 Raw cropType value: ${prediction['cropType']}');
+    print('🔵 Raw location value: ${prediction['location']}');
+    print('🔵 Raw predictedYield value: ${prediction['predictedYield']}');
+    print('🔵 Raw confidence value: ${prediction['confidence']}');
+    
     final cropType = prediction['cropType'] ?? 'Unknown Crop';
     final location = prediction['location'] ?? 'Unknown Location';
     final predictedYield = prediction['predictedYield'] ?? 'N/A';
-    final confidence = prediction['confidence'] ?? 0.0;
+    final confidence = (prediction['confidence'] ?? 0.0).toDouble();
     
     print('🔵 Card data - Crop: $cropType, Location: $location, Yield: $predictedYield, Confidence: $confidence');
     

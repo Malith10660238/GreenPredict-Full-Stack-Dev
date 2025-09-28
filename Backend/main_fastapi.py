@@ -760,7 +760,7 @@ async def analyze_crop_prediction(prediction_data: dict, current_user: Dict[str,
             'created_at': datetime.now()
         }
         
-        db.collection('predictions').document(prediction_id).set(prediction_doc)
+        db.collection('crop_predictions_ai').document(prediction_id).set(prediction_doc)
         
         return {
             "prediction_id": prediction_id,
