@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
 import '../../providers/listing_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/app_theme.dart';
@@ -7,6 +8,57 @@ import 'product_detail_screen.dart';
 
 class FavoritesScreen extends StatelessWidget {
   const FavoritesScreen({super.key});
+
+  static Widget _buildFavoriteImage(Map<String, dynamic> item) {
+    final images = item['images'] as List?;
+    
+    if (images == null || images.isEmpty) {
+      // Show default icon if no images
+      return Container(
+        decoration: BoxDecoration(
+          color: AppTheme.lightGray,
+        ),
+        child: const Icon(Icons.eco, color: AppTheme.primaryGreen),
+      );
+    }
+    
+    final firstImagePath = images.first.toString();
+    
+    // Check if it's a local file path or network URL
+    if (firstImagePath.startsWith('/') || firstImagePath.startsWith('file://')) {
+      // Local file - use Image.file
+      return Image.file(
+        File(firstImagePath),
+        width: 56,
+        height: 56,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            decoration: BoxDecoration(
+              color: AppTheme.lightGray,
+            ),
+            child: const Icon(Icons.eco, color: AppTheme.primaryGreen),
+          );
+        },
+      );
+    } else {
+      // Network URL - use Image.network
+      return Image.network(
+        firstImagePath,
+        width: 56,
+        height: 56,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            decoration: BoxDecoration(
+              color: AppTheme.lightGray,
+            ),
+            child: const Icon(Icons.eco, color: AppTheme.primaryGreen),
+          );
+        },
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,10 +113,13 @@ class FavoritesScreen extends StatelessWidget {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: AppTheme.lightGray,
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)),
                       ),
-                      child: const Icon(Icons.eco, color: AppTheme.primaryGreen),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: _buildFavoriteImage(item),
+                      ),
                     ),
                     title: Text(item['cropName']?.toString() ?? 'Item', style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.w600)),
                     subtitle: Text('Rs. ${item['price']}/kg • ${item['location']}', style: AppTheme.caption),

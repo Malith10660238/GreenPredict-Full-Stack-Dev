@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
 import '../../utils/app_theme.dart';
 import '../../providers/listing_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -83,6 +84,57 @@ class _ListingCard extends StatefulWidget {
 class _ListingCardState extends State<_ListingCard> {
   bool _pressed = false;
 
+  Widget _buildListingImage() {
+    final images = widget.item['images'] as List?;
+    
+    if (images == null || images.isEmpty) {
+      // Show default icon if no images
+      return Container(
+        decoration: BoxDecoration(
+          gradient: AppTheme.primaryGradient,
+        ),
+        child: const Icon(Icons.eco_rounded, color: Colors.white),
+      );
+    }
+    
+    final firstImagePath = images.first.toString();
+    
+    // Check if it's a local file path or network URL
+    if (firstImagePath.startsWith('/') || firstImagePath.startsWith('file://')) {
+      // Local file - use Image.file
+      return Image.file(
+        File(firstImagePath),
+        width: 64,
+        height: 64,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            decoration: BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+            ),
+            child: const Icon(Icons.eco_rounded, color: Colors.white),
+          );
+        },
+      );
+    } else {
+      // Network URL - use Image.network
+      return Image.network(
+        firstImagePath,
+        width: 64,
+        height: 64,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            decoration: BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+            ),
+            child: const Icon(Icons.eco_rounded, color: Colors.white),
+          );
+        },
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final crop = widget.item['cropName'] ?? 'Item';
@@ -119,9 +171,12 @@ class _ListingCardState extends State<_ListingCard> {
               height: 64,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                gradient: AppTheme.primaryGradient,
+                border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)),
               ),
-              child: const Icon(Icons.eco_rounded, color: Colors.white),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _buildListingImage(),
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(

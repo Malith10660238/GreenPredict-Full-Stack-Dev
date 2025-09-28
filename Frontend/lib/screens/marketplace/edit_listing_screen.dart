@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
 import '../../providers/listing_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/app_theme.dart';
@@ -27,6 +28,9 @@ class _EditListingScreenState extends State<EditListingScreen> {
   
   bool _isOrganic = false;
   String _selectedCategory = 'Vegetables';
+  
+  // Track which existing images to remove
+  Set<int> _imagesToRemove = {};
   
   final List<String> _categories = [
     'Vegetables', 'Fruits', 'Grains', 'Spices', 'Other'
@@ -375,7 +379,7 @@ class _EditListingScreenState extends State<EditListingScreen> {
             builder: (context, provider, child) {
               return Column(
                 children: [
-                  // Current Images
+                  // Current Images with Delete Option
                   if (widget.listing['images'] != null && (widget.listing['images'] as List).isNotEmpty) ...[
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -395,22 +399,19 @@ class _EditListingScreenState extends State<EditListingScreen> {
                                 color: AppTheme.primaryGreen,
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                'Current Product Images (${(widget.listing['images'] as List).length})',
-                                style: AppTheme.bodyMedium.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primaryGreen,
+                              Expanded(
+                                child: Text(
+                                  'Current Product Images (${(widget.listing['images'] as List).length})',
+                                  style: AppTheme.bodyMedium.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primaryGreen,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            'These images are already part of your listing:',
-                            style: AppTheme.caption.copyWith(
-                              color: AppTheme.darkGray,
-                            ),
-                          ),
                           const SizedBox(height: 12),
                           SizedBox(
                             height: 120,
@@ -419,6 +420,8 @@ class _EditListingScreenState extends State<EditListingScreen> {
                               itemCount: (widget.listing['images'] as List).length,
                               itemBuilder: (context, index) {
                                 final imagePath = widget.listing['images'][index];
+                                final isMarkedForRemoval = _imagesToRemove.contains(index);
+                                
                                 return Container(
                                   margin: const EdgeInsets.only(right: 12),
                                   child: Stack(
@@ -427,13 +430,37 @@ class _EditListingScreenState extends State<EditListingScreen> {
                                         decoration: BoxDecoration(
                                           borderRadius: BorderRadius.circular(12),
                                           border: Border.all(
-                                            color: AppTheme.primaryGreen,
+                                            color: isMarkedForRemoval ? Colors.red : AppTheme.primaryGreen,
                                             width: 2,
                                           ),
                                         ),
                                         child: ClipRRect(
                                           borderRadius: BorderRadius.circular(10),
-                                          child: _buildNetworkImageWithFallback(imagePath, 120, 120),
+                                          child: SizedBox(
+                                            width: 120,
+                                            height: 120,
+                                            child: Stack(
+                                              children: [
+                                                _buildNetworkImageWithFallback(imagePath, 120, 120),
+                                                if (isMarkedForRemoval)
+                                                  Container(
+                                                    width: 120,
+                                                    height: 120,
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.red.withOpacity(0.7),
+                                                      borderRadius: BorderRadius.circular(10),
+                                                    ),
+                                                    child: const Center(
+                                                      child: Icon(
+                                                        Icons.delete_forever,
+                                                        color: Colors.white,
+                                                        size: 32,
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
                                         ),
                                       ),
                                       Positioned(
@@ -442,15 +469,35 @@ class _EditListingScreenState extends State<EditListingScreen> {
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: AppTheme.primaryGreen,
+                                            color: isMarkedForRemoval ? Colors.red : AppTheme.primaryGreen,
                                             borderRadius: BorderRadius.circular(12),
                                           ),
                                           child: Text(
-                                            'Image ${index + 1}',
+                                            isMarkedForRemoval ? 'REMOVE' : 'Image ${index + 1}',
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      // Delete button
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: GestureDetector(
+                                          onTap: () => _removeExistingImage(index),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: isMarkedForRemoval ? Colors.green : Colors.red,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Icon(
+                                              isMarkedForRemoval ? Icons.undo : Icons.close,
+                                              color: Colors.white,
+                                              size: 16,
                                             ),
                                           ),
                                         ),
@@ -729,13 +776,28 @@ class _EditListingScreenState extends State<EditListingScreen> {
 
   bool _hasUnsavedChanges() {
     // Check if any form fields have been modified
-    return _cropNameController.text != (widget.listing['cropName'] ?? '') ||
+    bool formChanges = _cropNameController.text != (widget.listing['cropName'] ?? '') ||
            _descriptionController.text != (widget.listing['description'] ?? '') ||
            _priceController.text != (widget.listing['price']?.toString() ?? '') ||
            _quantityController.text != (widget.listing['quantity']?.toString() ?? '') ||
            _locationController.text != (widget.listing['location'] ?? '') ||
            _isOrganic != (widget.listing['isOrganic'] ?? false) ||
            _selectedCategory != (widget.listing['category'] ?? 'Vegetables');
+    
+    // Check if any images are marked for removal
+    bool imageRemovalChanges = _imagesToRemove.isNotEmpty;
+    
+    return formChanges || imageRemovalChanges;
+  }
+
+  void _removeExistingImage(int index) {
+    setState(() {
+      if (_imagesToRemove.contains(index)) {
+        _imagesToRemove.remove(index);
+      } else {
+        _imagesToRemove.add(index);
+      }
+    });
   }
 
   void _showDiscardChangesDialog(BuildContext context) {
@@ -785,6 +847,19 @@ class _EditListingScreenState extends State<EditListingScreen> {
                   );
                 }
                 
+                // Check for images to remove
+                if (_imagesToRemove.isNotEmpty) {
+                  changeItems.add(
+                    Text(
+                      '• ${_imagesToRemove.length} image(s) marked for removal',
+                      style: AppTheme.bodyMedium.copyWith(
+                        color: Colors.red,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+                }
+                
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: changeItems,
@@ -811,6 +886,9 @@ class _EditListingScreenState extends State<EditListingScreen> {
               // Clear selected images and go back
               final listingProvider = Provider.of<ListingProvider>(context, listen: false);
               listingProvider.clearSelectedImages();
+              setState(() {
+                _imagesToRemove.clear();
+              });
               Navigator.pop(context); // Close dialog
               Navigator.pop(context); // Go back to previous screen
             },
@@ -823,54 +901,87 @@ class _EditListingScreenState extends State<EditListingScreen> {
   }
 
   Widget _buildNetworkImageWithFallback(String imagePath, double width, double height) {
-    return Image.network(
-      imagePath,
+    print('🔍 Loading image: $imagePath');
+    
+    // Check if it's a local file path or network URL
+    if (imagePath.startsWith('/') || imagePath.startsWith('file://')) {
+      // Local file - use Image.file
+      return Image.file(
+        File(imagePath),
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('❌ Local file load error for $imagePath: $error');
+          return _buildErrorPlaceholder(width, height);
+        },
+      );
+    } else {
+      // Network URL - use Image.network
+      return Image.network(
+        imagePath,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            width: width,
+            height: height,
+            decoration: BoxDecoration(
+              color: AppTheme.lightGray,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          print('❌ Network image load error for $imagePath: $error');
+          return _buildErrorPlaceholder(width, height);
+        },
+      );
+    }
+  }
+
+  Widget _buildErrorPlaceholder(double width, double height) {
+    return Container(
       width: width,
       height: height,
-      fit: BoxFit.cover,
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) return child;
-        return Container(
-          width: width,
-          height: height,
-          color: AppTheme.lightGray,
-          child: const Center(
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+      decoration: BoxDecoration(
+        color: AppTheme.lightGray,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.broken_image,
+            color: Colors.red,
+            size: 32,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Failed to load',
+            style: AppTheme.caption.copyWith(
+              color: Colors.red,
+              fontWeight: FontWeight.w600,
             ),
           ),
-        );
-      },
-      errorBuilder: (context, error, stackTrace) {
-        // Show a placeholder with product icon
-        return Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            color: AppTheme.lightGray,
-            borderRadius: BorderRadius.circular(10),
+          const SizedBox(height: 2),
+          Text(
+            'Tap to retry',
+            style: AppTheme.caption.copyWith(
+              color: AppTheme.darkGray,
+              fontSize: 10,
+            ),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.eco,
-                color: AppTheme.primaryGreen,
-                size: 32,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Product Image',
-                style: AppTheme.caption.copyWith(
-                  color: AppTheme.primaryGreen,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -894,12 +1005,17 @@ class _EditListingScreenState extends State<EditListingScreen> {
       };
       
 
-      // Combine existing images with new images
+      // Combine existing images with new images, excluding removed ones
       List<String> allImages = [];
       
-      // Add existing images
+      // Add existing images (excluding those marked for removal)
       if (widget.listing['images'] != null) {
-        allImages.addAll(List<String>.from(widget.listing['images']));
+        List<String> existingImages = List<String>.from(widget.listing['images']);
+        for (int i = 0; i < existingImages.length; i++) {
+          if (!_imagesToRemove.contains(i)) {
+            allImages.add(existingImages[i]);
+          }
+        }
       }
       
       // Add new images
@@ -908,10 +1024,8 @@ class _EditListingScreenState extends State<EditListingScreen> {
         allImages.addAll(newImagePaths);
       }
       
-      // Only update images if there are any images (existing or new)
-      if (allImages.isNotEmpty) {
-        updatedData['images'] = allImages;
-      }
+      // Always update images (even if empty, to remove all images)
+      updatedData['images'] = allImages;
 
       // Get the auth token
       String? token = authProvider.authToken;
@@ -929,8 +1043,11 @@ class _EditListingScreenState extends State<EditListingScreen> {
 
       if (mounted) {
         if (listingProvider.errorMessage == null) {
-          // Clear selected images after successful update
+          // Clear selected images and removal tracking after successful update
           listingProvider.clearSelectedImages();
+          setState(() {
+            _imagesToRemove.clear();
+          });
           
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
