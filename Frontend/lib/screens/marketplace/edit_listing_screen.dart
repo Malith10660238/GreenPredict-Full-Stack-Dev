@@ -892,6 +892,7 @@ class _EditListingScreenState extends State<EditListingScreen> {
         'farmerId': authProvider.user?.uid ?? 'unknown',
         'contact': authProvider.user?.phone ?? '',
       };
+      
 
       // Combine existing images with new images
       List<String> allImages = [];

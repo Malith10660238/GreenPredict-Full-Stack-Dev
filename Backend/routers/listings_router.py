@@ -60,6 +60,7 @@ async def get_listings(
             result.append(ListingResponse(
                 id=listing.id,
                 cropName=listing_data.get('crop_name', ''),
+                category=listing_data.get('category', ''),
                 farmerId=listing_data.get('farmer_id', ''),
                 farmerName=listing_data.get('farmer_name', ''),
                 price=listing_data.get('price', 0),
@@ -109,6 +110,7 @@ async def create_listing(
         # Prepare listing document
         listing_doc = {
             'crop_name': listing_data.crop_name,
+            'category': listing_data.category,
             'farmer_id': current_user['uid'],
             'farmer_name': current_user.get('display_name', ''),
             'price': listing_data.price,
@@ -169,6 +171,7 @@ async def get_listing_by_id(listing_id: str):
         return ListingResponse(
             id=listing_doc.id,
             cropName=listing_data.get('crop_name', ''),
+            category=listing_data.get('category', ''),
             farmerId=listing_data.get('farmer_id', ''),
             farmerName=listing_data.get('farmer_name', ''),
             price=listing_data.get('price', 0),
@@ -227,6 +230,10 @@ async def update_listing(
             if value is not None:
                 update_data[field] = value
         
+        # Ensure category field is always present
+        if 'category' not in update_data:
+            update_data['category'] = 'Vegetables'  # Default category
+        
         update_data['updated_at'] = datetime.now()
         
         # Update listing
@@ -238,20 +245,21 @@ async def update_listing(
         
         return ListingResponse(
             id=updated_doc.id,
-            crop_name=updated_data.get('crop_name', ''),
-            farmer_id=updated_data.get('farmer_id', ''),
-            farmer_name=updated_data.get('farmer_name', ''),
+            cropName=updated_data.get('crop_name', ''),
+            category=updated_data.get('category', 'Vegetables'),  # Default to 'Vegetables' if missing
+            farmerId=updated_data.get('farmer_id', ''),
+            farmerName=updated_data.get('farmer_name', ''),
             price=updated_data.get('price', 0),
             quantity=updated_data.get('quantity', 0),
             location=updated_data.get('location', ''),
             description=updated_data.get('description', ''),
             contact=updated_data.get('contact', ''),
-            is_organic=updated_data.get('is_organic', False),
+            isOrganic=updated_data.get('is_organic', False),
             rating=updated_data.get('rating'),
             images=updated_data.get('images', []),
             status=ListingStatus(updated_data.get('status', 'active')),
-            manufactured_date=updated_data.get('manufactured_date'),
-            created_at=updated_data.get('created_at', datetime.now())
+            manufacturedDate=updated_data.get('manufactured_date'),
+            createdAt=updated_data.get('created_at', datetime.now())
         )
         
     except HTTPException:
@@ -338,6 +346,7 @@ async def get_farmer_listings(
             result.append(ListingResponse(
                 id=listing.id,
                 cropName=listing_data.get('crop_name', ''),
+                category=listing_data.get('category', ''),
                 farmerId=listing_data.get('farmer_id', ''),
                 farmerName=listing_data.get('farmer_name', ''),
                 price=listing_data.get('price', 0),

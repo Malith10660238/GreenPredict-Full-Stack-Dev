@@ -596,6 +596,7 @@ async def create_listing(listing_data: dict, current_user: dict = Depends(get_cu
         listing = {
             "id": listing_id,
             "cropName": listing_data.get("cropName"),
+            "category": listing_data.get("category", "Vegetables"),  # Add category field with default
             "price": float(listing_data.get("price", 0)),
             "quantity": int(listing_data.get("quantity", 0)),
             "location": listing_data.get("location"),
@@ -694,11 +695,13 @@ async def update_listing(listing_id: str, listing_data: dict, current_user: dict
             "updatedAt": datetime.now()
         }
         
-        for field in ["cropName", "price", "quantity", "location", "description", "contact", "isOrganic", "images", "status"]:
+        for field in ["cropName", "category", "price", "quantity", "location", "description", "contact", "isOrganic", "images", "status"]:
             if field in listing_data:
                 update_data[field] = listing_data[field]
                 if field == "images":
                     print(f"🔍 Updating images: {listing_data[field]}")
+                if field == "category":
+                    print(f"🔍 Updating category: {listing_data[field]}")
         
         listing_ref.update(update_data)
         

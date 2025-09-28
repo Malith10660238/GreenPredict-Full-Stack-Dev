@@ -160,12 +160,18 @@ class ListingProvider with ChangeNotifier {
       _setLoading(true);
       _setError(null);
       
-      // Always include images in the update data
-      // Convert File objects to paths for storage
-      List<String> imagePaths = _selectedImages.map((file) => file.path).toList();
-      listingData['images'] = imagePaths;
-      
-      print('🔵 Updating listing with images: $imagePaths');
+      // Handle images: use the images from listingData if provided, otherwise use selectedImages
+      if (listingData.containsKey('images')) {
+        // Images are already processed in the calling code (edit screen)
+        print('🔵 Using pre-processed images from listingData: ${listingData['images']}');
+      } else if (_selectedImages.isNotEmpty) {
+        // Convert File objects to paths for storage (for create listing)
+        List<String> imagePaths = _selectedImages.map((file) => file.path).toList();
+        listingData['images'] = imagePaths;
+        print('🔵 Updating listing with selected images: $imagePaths');
+      } else {
+        print('🔵 No images to update, preserving existing images');
+      }
       
       final apiService = ApiService();
       final updatedListing = await apiService.updateListing(listingId, listingData, token);

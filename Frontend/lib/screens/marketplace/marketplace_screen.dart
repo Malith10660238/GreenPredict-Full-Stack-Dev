@@ -30,7 +30,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     'All', 'Vegetables', 'Fruits', 'Grains', 'Spices'
   ];
   final List<String> _locations = [
-    'All', 'Colombo', 'Kandy', 'Galle', 'Nuwara Eliya', 'Anuradhapura'
+    'All', 'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo', 
+    'Galle', 'Gampaha', 'Hambantota', 'Jaffna', 'Kalutara', 'Kandy', 
+    'Kegalle', 'Kilinochchi', 'Kurunegala', 'Mannar', 'Matale', 'Matara', 
+    'Monaragala', 'Mullaitivu', 'Nuwara Eliya', 'Polonnaruwa', 'Puttalam', 
+    'Ratnapura', 'Trincomalee', 'Vavuniya'
   ];
   final List<String> _priceRanges = [
     'All', 'Under Rs. 100', 'Rs. 100 - 200', 'Rs. 200 - 500', 'Above Rs. 500'
@@ -337,6 +341,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             () => setState(() => _organicOnly = !_organicOnly),
             icon: Icons.eco_outlined,
           ),
+          if (_selectedLocation != 'All') ...[
+            const SizedBox(width: 8),
+            _buildFilterChip(
+              _selectedLocation,
+              true,
+              () => _showAdvancedFilters(),
+              icon: Icons.location_on,
+            ),
+          ],
         ],
       ),
     );
@@ -1044,19 +1057,28 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Location', style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      children: _locations.map((location) => FilterChip(
-                        label: Text(location),
-                        selected: _selectedLocation == location,
-                        onSelected: (_) {
-                          setState(() => _selectedLocation = location);
-                          Navigator.pop(context);
-                        },
-                      )).toList(),
+                    Row(
+                      children: [
+                        Text('Location', style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryGreen.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${_locations.length - 1} districts',
+                            style: AppTheme.caption.copyWith(
+                              color: AppTheme.primaryGreen,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 10),
+                    _buildLocationSelector(),
                     const SizedBox(height: 20),
                     Text('Price Range', style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 10),
@@ -1070,6 +1092,32 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                           Navigator.pop(context);
                         },
                       )).toList(),
+                    ),
+                    const SizedBox(height: 30),
+                    // Clear All Filters Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _selectedLocation = 'All';
+                            _priceRange = 'All';
+                            _selectedCategory = 'All';
+                            _organicOnly = false;
+                          });
+                          Navigator.pop(context);
+                        },
+                        icon: const Icon(Icons.clear_all, color: Colors.white),
+                        label: const Text('Clear All Filters'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.darkGray,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -1100,6 +1148,106 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => const CreateListingScreen(),
+      ),
+    );
+  }
+
+  Widget _buildLocationSelector() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.mediumGray.withOpacity(0.5)),
+      ),
+      child: Autocomplete<String>(
+        initialValue: _selectedLocation != 'All' 
+            ? TextEditingValue(text: _selectedLocation) 
+            : null,
+        optionsBuilder: (TextEditingValue textEditingValue) {
+          if (textEditingValue.text.isEmpty) {
+            return _locations.where((location) => location != 'All');
+          }
+          return _locations.where((location) {
+            return location.toLowerCase().contains(textEditingValue.text.toLowerCase());
+          });
+        },
+        onSelected: (String selection) {
+          setState(() => _selectedLocation = selection);
+        },
+        fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+          return TextField(
+            controller: textEditingController,
+            focusNode: focusNode,
+            decoration: InputDecoration(
+              hintText: _selectedLocation == 'All' ? 'Search districts...' : _selectedLocation,
+              prefixIcon: const Icon(Icons.search, color: AppTheme.primaryGreen),
+              suffixIcon: _selectedLocation != 'All' 
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: AppTheme.darkGray),
+                      onPressed: () {
+                        setState(() => _selectedLocation = 'All');
+                        textEditingController.clear();
+                      },
+                    )
+                  : const Icon(Icons.arrow_drop_down, color: AppTheme.darkGray),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+            onChanged: (value) {
+              if (value.isEmpty) {
+                setState(() => _selectedLocation = 'All');
+              }
+            },
+          );
+        },
+        optionsViewBuilder: (context, onSelected, options) {
+          return Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 8.0,
+              borderRadius: BorderRadius.circular(12),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 300),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (context, index) {
+                    final option = options.elementAt(index);
+                    final isSelected = _selectedLocation == option;
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppTheme.primaryGreen.withOpacity(0.1) : null,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ListTile(
+                        dense: true,
+                        leading: Icon(
+                          Icons.location_on,
+                          color: isSelected ? AppTheme.primaryGreen : AppTheme.darkGray,
+                          size: 20,
+                        ),
+                        title: Text(
+                          option,
+                          style: AppTheme.bodyMedium.copyWith(
+                            color: isSelected ? AppTheme.primaryGreen : AppTheme.textDark,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                        ),
+                        trailing: isSelected 
+                            ? const Icon(Icons.check, color: AppTheme.primaryGreen, size: 20)
+                            : null,
+                        onTap: () {
+                          onSelected(option);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

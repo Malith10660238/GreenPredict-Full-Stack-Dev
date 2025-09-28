@@ -11,6 +11,7 @@ class ListingStatus(str, Enum):
 class ListingBase(BaseModel):
     """Base listing model"""
     crop_name: str
+    category: str
     price: float
     quantity: int
     location: str
@@ -25,6 +26,7 @@ class ListingCreate(ListingBase):
 class ListingUpdate(BaseModel):
     """Listing update model"""
     crop_name: Optional[str] = None
+    category: Optional[str] = None
     price: Optional[float] = None
     quantity: Optional[int] = None
     location: Optional[str] = None
@@ -53,6 +55,7 @@ class ListingResponse(BaseModel):
     """Listing response model for API"""
     id: str
     cropName: str  # Changed from crop_name to cropName for frontend compatibility
+    category: str
     farmerId: str  # Changed from farmer_id to farmerId
     farmerName: str  # Changed from farmer_name to farmerName
     price: float
