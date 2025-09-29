@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "320993770464",
+    "project_id": "green-predict",
+    "storage_bucket": "green-predict.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:320993770464:android:239e358f9b827afc20c985",
+        "android_client_info": {
+          "package_name": "com.example.flutterapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "320993770464-hs6aks2103v72utag6r82gtfdcv4k8co.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.flutterapp",
+            "certificate_hash": "bec771eebe2b11f75f22f124a2dbecd9aaaca487"
+          }
+        },
+        {
+          "client_id": "320993770464-uhu5dcn5v460ighvfu5om22tre0hn3mu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBX-PWbEjZn25Vpi4_XhrcCyL_sdBZK-LI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "320993770464-uhu5dcn5v460ighvfu5om22tre0hn3mu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/crop_provider.dart';
 import 'providers/listing_provider.dart';
@@ -12,8 +14,19 @@ import 'screens/marketplace/my_listings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Firebase removed temporarily - uncomment when needed:
-  // await Firebase.initializeApp();
+  // Initialize Firebase (check if already initialized)
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    // Firebase already initialized, continue
+    if (e.toString().contains('duplicate-app')) {
+      print('Firebase already initialized, continuing...');
+    } else {
+      print('Firebase initialization error: $e');
+    }
+  }
   runApp(const MyApp());
 }
 

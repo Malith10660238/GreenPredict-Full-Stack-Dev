@@ -305,6 +305,27 @@ Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
     }
   }
   
+  // Google Authentication API
+  Future<Map<String, dynamic>> googleAuth(Map<String, dynamic> userData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl$_authEndpoint/google'),
+        headers: _headers,
+        body: jsonEncode(userData),
+      );
+      
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        print('❌ Google auth failed - Status: ${response.statusCode}, Body: ${response.body}');
+        throw Exception('Google authentication failed: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during Google auth: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+  
   // Email Verification APIs
   Future<Map<String, dynamic>> verifyEmail(String email, String verificationCode) async {
     try {

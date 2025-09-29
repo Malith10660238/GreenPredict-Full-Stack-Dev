@@ -580,6 +580,197 @@ async def login(login_data: dict):
             detail=f"Login failed: {str(e)}"
         )
 
+@app.post("/auth/google", tags=["Authentication"])
+async def google_auth(google_data: dict):
+    """Google Sign-In authentication"""
+    try:
+        email = google_data.get('email')
+        firstName = google_data.get('firstName', 'Google')
+        lastName = google_data.get('lastName', 'User')
+        userType = google_data.get('userType', 'consumer')
+        
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email is required"
+            )
+        
+        # Check if user already exists
+        users_ref = db.collection('users')
+        query = users_ref.where('email', '==', email).limit(1)
+        docs = list(query.stream())
+        
+        if docs:
+            # User exists, return their data
+            user_doc = docs[0]
+            user_data = user_doc.to_dict()
+            user_data['uid'] = user_doc.id
+            
+            # Get type-specific profile data
+            if userType == "farmer":
+                farmer_doc = db.collection('farmers').document(user_doc.id).get()
+                if farmer_doc.exists:
+                    farmer_data = farmer_doc.to_dict()
+                    user_data['farmerProfile'] = {
+                        'farmName': farmer_data.get('farmName'),
+                        'farmSize': farmer_data.get('farmSize'),
+                        'crops': farmer_data.get('crops', []),
+                        'farmingExperience': farmer_data.get('farmingExperience'),
+                        'totalListings': farmer_data.get('totalListings'),
+                        'totalSales': farmer_data.get('totalSales'),
+                        'certification': farmer_data.get('certification')
+                    }
+            elif userType == "consumer":
+                consumer_doc = db.collection('consumers').document(user_doc.id).get()
+                if consumer_doc.exists:
+                    consumer_data = consumer_doc.to_dict()
+                    user_data['consumerProfile'] = {
+                        'preferences': consumer_data.get('preferences', []),
+                        'totalOrders': consumer_data.get('totalOrders'),
+                        'totalSpent': consumer_data.get('totalSpent'),
+                        'favoriteCrops': consumer_data.get('favoriteCrops', []),
+                        'deliveryAddress': consumer_data.get('deliveryAddress'),
+                        'paymentMethod': consumer_data.get('paymentMethod')
+                    }
+            
+            # Create custom token
+            custom_token = auth.create_custom_token(user_doc.id)
+            
+            return {
+                "access_token": custom_token.decode('utf-8'),
+                "user": {
+                    "uid": user_data.get('uid'),
+                    "email": user_data.get('email'),
+                    "first_name": user_data.get('firstName', ''),
+                    "last_name": user_data.get('lastName', ''),
+                    "display_name": user_data.get('displayName', ''),
+                    "user_type": user_data.get('userType', 'consumer'),
+                    "phone": user_data.get('phone'),
+                    "location": user_data.get('location'),
+                    "bio": user_data.get('bio'),
+                    "join_date": user_data.get('joinDate'),
+                    "rating": user_data.get('rating'),
+                    "total_reviews": user_data.get('totalReviews', 0),
+                    "farmer_profile": user_data.get('farmerProfile'),
+                    "consumer_profile": user_data.get('consumerProfile'),
+                    "profile_image_url": user_data.get('profileImageUrl')
+                }
+            }
+        else:
+            # User doesn't exist, create new user
+            # Create user in Firebase Auth (this will be handled by the frontend)
+            # Just create the Firestore profile
+            user_data = {
+                "email": email,
+                "firstName": firstName,
+                "lastName": lastName,
+                "displayName": f"{firstName} {lastName}",
+                "userType": userType,
+                "phone": "",
+                "location": "",
+                "bio": "",
+                "joinDate": datetime.now(),
+                "rating": 0.0,
+                "totalReviews": 0,
+                "profileImageUrl": None,
+                "createdAt": datetime.now(),
+                "updatedAt": datetime.now()
+            }
+            
+            # Add to users collection
+            user_ref = db.collection('users').add(user_data)
+            user_id = user_ref[1].id
+            
+            # Create type-specific profile
+            if userType == 'farmer':
+                farmer_data = {
+                    "uid": user_id,
+                    "email": email,
+                    "firstName": firstName,
+                    "lastName": lastName,
+                    "displayName": f"{firstName} {lastName}",
+                    "phone": "",
+                    "location": "",
+                    "bio": "",
+                    "joinDate": datetime.now(),
+                    "rating": 0.0,
+                    "totalReviews": 0,
+                    "farmName": "",
+                    "farmSize": "",
+                    "crops": [],
+                    "farmingExperience": "",
+                    "totalListings": 0,
+                    "totalSales": 0,
+                    "certification": "",
+                    "profileImageUrl": None,
+                    "createdAt": datetime.now(),
+                    "updatedAt": datetime.now()
+                }
+                db.collection('farmers').document(user_id).set(farmer_data)
+            elif userType == 'consumer':
+                consumer_data = {
+                    "uid": user_id,
+                    "email": email,
+                    "firstName": firstName,
+                    "lastName": lastName,
+                    "displayName": f"{firstName} {lastName}",
+                    "phone": "",
+                    "location": "",
+                    "bio": "",
+                    "joinDate": datetime.now(),
+                    "rating": 0.0,
+                    "totalReviews": 0,
+                    "consumerProfile": {
+                        "preferences": [],
+                        "totalOrders": 0,
+                        "totalSpent": 0.0,
+                        "favoriteCrops": [],
+                        "deliveryAddress": "",
+                        "paymentMethod": ""
+                    },
+                    "profileImageUrl": None,
+                    "createdAt": datetime.now(),
+                    "updatedAt": datetime.now()
+                }
+                db.collection('consumers').document(user_id).set(consumer_data)
+            
+            # Create custom token
+            custom_token = auth.create_custom_token(user_id)
+            
+            return {
+                "access_token": custom_token.decode('utf-8'),
+                "user": {
+                    "uid": user_id,
+                    "email": email,
+                    "first_name": firstName,
+                    "last_name": lastName,
+                    "display_name": f"{firstName} {lastName}",
+                    "user_type": userType,
+                    "phone": "",
+                    "location": "",
+                    "bio": "",
+                    "join_date": datetime.now(),
+                    "rating": 0.0,
+                    "total_reviews": 0,
+                    "farmer_profile": user_data.get("farmerProfile") if userType == "farmer" else None,
+                    "consumer_profile": {
+                        "preferences": [],
+                        "total_orders": 0,
+                        "total_spent": 0.0,
+                        "favorite_crops": [],
+                        "delivery_address": "",
+                        "payment_method": ""
+                    } if userType == "consumer" else None,
+                    "profile_image_url": None
+                }
+            }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Google authentication failed: {str(e)}"
+        )
+
 # ==================== USER PROFILE ENDPOINTS ====================
 
 @app.get("/profile/", tags=["User Profiles"])

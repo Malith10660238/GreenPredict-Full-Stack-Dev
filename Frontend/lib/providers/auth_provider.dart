@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/api_service.dart';
 
 // --- User Data Model ---
@@ -119,6 +121,14 @@ class AuthProvider with ChangeNotifier {
   String? _profileImageUrl;
   String? _authToken;
   final ApiService _apiService = ApiService();
+  
+  // Google Sign-In instance
+  GoogleSignIn get _googleSignIn => GoogleSignIn(
+    scopes: ['email', 'profile'],
+    serverClientId: '320993770464-uhu5dcn5v460ighvfu5om22tre0hn3mu.apps.googleusercontent.com',
+    forceCodeForRefreshToken: true,
+  );
+  FirebaseAuth get _firebaseAuth => FirebaseAuth.instance;
 
   AppUser? get user => _user;
   bool get isLoading => _isLoading;
@@ -603,27 +613,199 @@ class AuthProvider with ChangeNotifier {
     try {
       _setLoading(true);
       _setError(null);
-      await Future.delayed(const Duration(seconds: 1));
       
-      // TODO: Implement real Google Sign-In with backend API
-      _user = AppUser(
-        firstName: 'Google',
-        lastName: 'User',
-        displayName: 'Google User',
-        email: 'user@gmail.com',
-        uid: 'google_12345',
-        userType: 'consumer',
+      print('🔵 Starting Google Sign-In...');
+      
+      // First, sign out from any previous Google session
+      await _googleSignIn.signOut();
+      
+      // Trigger Google Sign-In
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        print('🔵 User cancelled Google Sign-In');
+        _setLoading(false);
+        return false; // User cancelled sign-in
+      }
+      
+      print('🔵 Google Sign-In successful, getting auth details...');
+      
+      // Get authentication details
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      
+      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+        print('🔵 Google auth tokens are null');
+        _setLoading(false);
+        _setError('Google authentication failed. Please try again.');
+        return false;
+      }
+      
+      print('🔵 Google auth details obtained, creating Firebase credential...');
+      
+      // Create Firebase credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
       );
-      _setLoading(false);
-      return true;
-    } catch (e) {
+      
+      print('🔵 Firebase credential created, signing in to Firebase...');
+      
+      // Sign in to Firebase with error handling
+      try {
+        final UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
+        final User? firebaseUser = userCredential.user;
+        
+        if (firebaseUser != null) {
+          print('🔵 Firebase sign-in successful, creating user profile...');
+          
+          // Create user profile directly without backend call for now
+          final userData = AppUser(
+            firstName: firebaseUser.displayName?.split(' ').first ?? 'Google',
+            lastName: firebaseUser.displayName?.split(' ').skip(1).join(' ') ?? 'User',
+            displayName: firebaseUser.displayName ?? 'Google User',
+            email: firebaseUser.email ?? '',
+            uid: firebaseUser.uid,
+            userType: 'consumer', // Default to consumer
+            phone: firebaseUser.phoneNumber,
+            location: null,
+            bio: null,
+            joinDate: DateTime.now(),
+            rating: 0.0,
+            totalReviews: 0,
+            preferences: [],
+            totalOrders: 0,
+            totalSpent: 0.0,
+            favoriteCrops: [],
+          );
+          
+          print('🔵 User profile created successfully');
+          _user = userData;
+          _setLoading(false);
+          return true;
+        }
+      } catch (firebaseError) {
+        print('🔵 Firebase Auth error: $firebaseError');
+        // If Firebase Auth fails, try to create user profile from Google data
+        print('🔵 Trying to create user profile from Google data...');
+        
+        final userData = AppUser(
+          firstName: googleUser.displayName?.split(' ').first ?? 'Google',
+          lastName: googleUser.displayName?.split(' ').skip(1).join(' ') ?? 'User',
+          displayName: googleUser.displayName ?? 'Google User',
+          email: googleUser.email,
+          uid: googleUser.id,
+          userType: 'consumer', // Default to consumer
+          phone: null,
+          location: null,
+          bio: null,
+          joinDate: DateTime.now(),
+          rating: 0.0,
+          totalReviews: 0,
+          preferences: [],
+          totalOrders: 0,
+          totalSpent: 0.0,
+          favoriteCrops: [],
+        );
+        
+        print('🔵 User profile created from Google data');
+        _user = userData;
+        _setLoading(false);
+        return true;
+      }
+      
+      print('🔵 Google sign-in failed - no Firebase user');
       _setLoading(false);
       _setError('Google sign-in failed. Please try again.');
+      return false;
+    } catch (e) {
+      print('🔵 Google sign-in error: $e');
+      _setLoading(false);
+      _setError('Google sign-in failed: ${e.toString()}');
       return false;
     }
   }
   
+  Future<AppUser?> _createOrGetGoogleUser(User firebaseUser) async {
+    try {
+      print('🔵 Creating/Getting Google user for: ${firebaseUser.email}');
+      
+      // Use the new Google authentication endpoint
+      final userData = {
+        'email': firebaseUser.email,
+        'firstName': firebaseUser.displayName?.split(' ').first ?? 'Google',
+        'lastName': firebaseUser.displayName?.split(' ').skip(1).join(' ') ?? 'User',
+        'userType': 'consumer', // Default to consumer, can be changed later
+      };
+      
+      print('🔵 Sending Google auth data: $userData');
+      final response = await _apiService.googleAuth(userData);
+      print('🔵 Google auth response: $response');
+      
+      if (response['user'] != null) {
+        print('🔵 Creating AppUser from response...');
+        return _createAppUserFromResponse(response['user']);
+      } else {
+        print('🔵 No user data in response');
+        return null;
+      }
+    } catch (e) {
+      print('🔵 Error with Google authentication: $e');
+      print('🔵 Error type: ${e.runtimeType}');
+      print('🔵 Error details: ${e.toString()}');
+    }
+    
+    return null;
+  }
+  
+  AppUser _createAppUserFromResponse(Map<String, dynamic> userData) {
+    try {
+      print('🔵 Creating AppUser from data: $userData');
+      
+      return AppUser(
+        firstName: userData['firstName'] ?? userData['first_name'],
+        lastName: userData['lastName'] ?? userData['last_name'],
+        displayName: userData['displayName'] ?? userData['display_name'],
+        email: userData['email'],
+        uid: userData['uid'],
+        userType: userData['userType'] ?? userData['user_type'] ?? 'consumer',
+        phone: userData['phone'],
+        location: userData['location'],
+        bio: userData['bio'],
+        joinDate: userData['joinDate'] != null 
+            ? DateTime.parse(userData['joinDate']) 
+            : userData['join_date'] != null 
+                ? DateTime.parse(userData['join_date']) 
+                : DateTime.now(),
+        rating: userData['rating']?.toDouble(),
+        totalReviews: userData['totalReviews'] ?? userData['total_reviews'],
+        // Farmer-specific data
+        farmName: userData['farmerProfile']?['farmName'] ?? userData['farmer_profile']?['farm_name'],
+        farmSize: userData['farmerProfile']?['farmSize'] ?? userData['farmer_profile']?['farm_size'],
+        crops: userData['farmerProfile']?['crops']?.cast<String>() ?? userData['farmer_profile']?['crops']?.cast<String>(),
+        farmingExperience: userData['farmerProfile']?['farmingExperience'] ?? userData['farmer_profile']?['farming_experience'],
+        totalListings: userData['farmerProfile']?['totalListings'] ?? userData['farmer_profile']?['total_listings'],
+        totalSales: userData['farmerProfile']?['totalSales'] ?? userData['farmer_profile']?['total_sales'],
+        certification: userData['farmerProfile']?['certification'] ?? userData['farmer_profile']?['certification'],
+        // Consumer-specific data
+        preferences: userData['consumerProfile']?['preferences']?.cast<String>() ?? userData['consumer_profile']?['preferences']?.cast<String>(),
+        totalOrders: userData['consumerProfile']?['totalOrders'] ?? userData['consumer_profile']?['total_orders'],
+        totalSpent: userData['consumerProfile']?['totalSpent']?.toDouble() ?? userData['consumer_profile']?['total_spent']?.toDouble(),
+        favoriteCrops: userData['consumerProfile']?['favoriteCrops']?.cast<String>() ?? userData['consumer_profile']?['favorite_crops']?.cast<String>(),
+      );
+    } catch (e) {
+      print('🔵 Error creating AppUser: $e');
+      print('🔵 UserData type: ${userData.runtimeType}');
+      print('🔵 UserData content: $userData');
+      rethrow;
+    }
+  }
+  
   Future<void> signOut() async {
+    // Sign out from Google
+    await _googleSignIn.signOut();
+    
+    // Sign out from Firebase
+    await _firebaseAuth.signOut();
+    
     _user = null;
     _profileImageFile = null;
     _profileImageUrl = null;
