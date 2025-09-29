@@ -34,9 +34,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _register() async {
+    print('🔵 [REGISTER] Starting registration process...');
+    print('🔵 [REGISTER] Selected user type: $_selectedUserType');
+    print('🔵 [REGISTER] Email: ${_emailController.text.trim()}');
+    print('🔵 [REGISTER] First name: ${_firstNameController.text.trim()}');
+    print('🔵 [REGISTER] Last name: ${_lastNameController.text.trim()}');
+    
     if (_formKey.currentState!.validate()) {
+      print('🔵 [REGISTER] Form validation passed');
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
+      print('🔵 [REGISTER] Calling signUpWithEmailAndPassword...');
       final success = await authProvider.signUpWithEmailAndPassword(
         _emailController.text.trim(),
         _passwordController.text,
@@ -45,8 +53,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _selectedUserType,
       );
       
+      print('🔵 [REGISTER] Registration result: $success');
+      
       if (success && mounted) {
-        // Navigate to email verification screen instead of home
+        // Navigate to email verification screen
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -134,6 +144,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             Expanded(
                               child: GestureDetector(
                                 onTap: () {
+                                  print('🔵 [REGISTER] Farmer selected');
                                   setState(() {
                                     _selectedUserType = 'farmer';
                                   });
@@ -180,6 +191,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             Expanded(
                               child: GestureDetector(
                                 onTap: () {
+                                  print('🔵 [REGISTER] Consumer selected');
                                   setState(() {
                                     _selectedUserType = 'consumer';
                                   });

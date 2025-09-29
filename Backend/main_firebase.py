@@ -188,6 +188,26 @@ async def register(register_data: dict):
         import hashlib
         password_hash = hashlib.sha256(password.encode()).hexdigest()
         
+        # Generate verification code
+        import random
+        import string
+        verification_code = ''.join(random.choices(string.digits, k=6))
+        
+        # Send real email verification
+        from email_service import email_service
+        email_sent = email_service.send_verification_email(
+            recipient_email=email,
+            verification_code=verification_code,
+            user_name=f"{firstName} {lastName}"
+        )
+        
+        if email_sent:
+            print(f"✅ Verification email sent successfully to: {email}")
+        else:
+            print(f"⚠️ Failed to send email to {email}, but registration continues")
+            print(f"📧 [FALLBACK] Verification code for {email}: {verification_code}")
+            print(f"📧 [FALLBACK] Use this code in the app to verify your email")
+        
         # Prepare user data for Firestore
         user_data = {
             "email": email,
@@ -202,6 +222,9 @@ async def register(register_data: dict):
             "joinDate": datetime.now(),
             "rating": None,
             "totalReviews": 0,
+            "email_verified": False,  # Track email verification status
+            "verification_code": verification_code,
+            "verification_code_expires": datetime.now().timestamp() + 3600,  # 1 hour expiry
             "createdAt": datetime.now(),
             "updatedAt": datetime.now()
         }
@@ -267,12 +290,14 @@ async def register(register_data: dict):
                 "joinDate": datetime.now(),
                 "rating": 0.0,
                 "totalReviews": 0,
-                "preferences": [],
-                "totalOrders": 0,
-                "totalSpent": 0.0,
-                "favoriteCrops": [],
-                "deliveryAddress": "",
-                "paymentMethod": "",
+                "consumerProfile": {
+                    "preferences": [],
+                    "totalOrders": 0,
+                    "totalSpent": 0.0,
+                    "favoriteCrops": [],
+                    "deliveryAddress": "",
+                    "paymentMethod": ""
+                },
                 "profileImageUrl": None,
                 "createdAt": datetime.now(),
                 "updatedAt": datetime.now()
@@ -299,6 +324,151 @@ async def register(register_data: dict):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Registration failed: {str(e)}"
+        )
+
+@app.post("/auth/verify-email", tags=["Authentication"])
+async def verify_email(verification_data: dict):
+    """Verify user email with verification code"""
+    try:
+        email = verification_data.get('email')
+        verification_code = verification_data.get('verification_code')
+        
+        if not email or not verification_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email and verification code are required"
+            )
+        
+        # Find user by email in Firestore
+        users_ref = db.collection('users')
+        query = users_ref.where('email', '==', email).limit(1)
+        docs = query.stream()
+        
+        user_doc = None
+        for doc in docs:
+            user_doc = doc
+            break
+        
+        if not user_doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        user_data = user_doc.to_dict()
+        
+        # Check if verification code matches
+        stored_code = user_data.get('verification_code')
+        code_expires = user_data.get('verification_code_expires', 0)
+        
+        if not stored_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No verification code found. Please register again."
+            )
+        
+        if datetime.now().timestamp() > code_expires:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verification code has expired. Please request a new one."
+            )
+        
+        if verification_code != stored_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification code. Please check and try again."
+            )
+        
+        # Update user's email verification status in Firestore
+        user_id = user_doc.id
+        db.collection('users').document(user_id).update({
+            'email_verified': True,
+            'verification_code': None,  # Remove the code after successful verification
+            'verification_code_expires': None,
+            'updated_at': datetime.now()
+        })
+        
+        return {
+            "message": "Email verified successfully",
+            "email_verified": True
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Email verification failed: {str(e)}"
+        )
+
+@app.post("/auth/resend-verification", tags=["Authentication"])
+async def resend_verification(resend_data: dict):
+    """Resend email verification code"""
+    try:
+        email = resend_data.get('email')
+        
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email is required"
+            )
+        
+        # Find user by email in Firestore
+        users_ref = db.collection('users')
+        query = users_ref.where('email', '==', email).limit(1)
+        docs = query.stream()
+        
+        user_doc = None
+        for doc in docs:
+            user_doc = doc
+            break
+        
+        if not user_doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        user_data = user_doc.to_dict()
+        user_id = user_doc.id
+        
+        # Generate new verification code
+        import random
+        import string
+        new_verification_code = ''.join(random.choices(string.digits, k=6))
+        
+        # Get user data for name
+        user_name = user_data.get('displayName', 'User')
+        
+        # Send real email verification
+        from email_service import email_service
+        email_sent = email_service.send_verification_email(
+            recipient_email=email,
+            verification_code=new_verification_code,
+            user_name=user_name
+        )
+        
+        if email_sent:
+            print(f"✅ Verification email resent successfully to: {email}")
+        else:
+            print(f"⚠️ Failed to resend email to {email}")
+            print(f"📧 [FALLBACK] New verification code for {email}: {new_verification_code}")
+            print(f"📧 [FALLBACK] Use this new code in the app to verify your email")
+        
+        # Update user with new verification code
+        db.collection('users').document(user_id).update({
+            'verification_code': new_verification_code,
+            'verification_code_expires': datetime.now().timestamp() + 3600,  # 1 hour expiry
+            'updated_at': datetime.now()
+        })
+        
+        return {
+            "message": "Verification email sent successfully",
+            "email": email
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to resend verification email: {str(e)}"
         )
 
 @app.post("/auth/login", tags=["Authentication"])
@@ -385,7 +555,23 @@ async def login(login_data: dict):
         
         return {
             "access_token": custom_token.decode('utf-8'),
-            "user": user_data
+            "user": {
+                "uid": user_data.get('uid'),
+                "email": user_data.get('email'),
+                "first_name": user_data.get('firstName', ''),
+                "last_name": user_data.get('lastName', ''),
+                "display_name": user_data.get('displayName', ''),
+                "user_type": user_data.get('userType', 'consumer'),
+                "phone": user_data.get('phone'),
+                "location": user_data.get('location'),
+                "bio": user_data.get('bio'),
+                "join_date": user_data.get('joinDate'),
+                "rating": user_data.get('rating'),
+                "total_reviews": user_data.get('totalReviews', 0),
+                "farmer_profile": user_data.get('farmerProfile'),
+                "consumer_profile": user_data.get('consumerProfile'),
+                "profile_image_url": user_data.get('profileImageUrl')
+            }
         }
         
     except Exception as e:
@@ -399,7 +585,25 @@ async def login(login_data: dict):
 @app.get("/profile/", tags=["User Profiles"])
 async def get_profile(current_user: dict = Depends(get_current_user)):
     """Get user profile from Firebase"""
-    return current_user
+    # Convert camelCase to snake_case for frontend compatibility
+    frontend_user = {
+        "uid": current_user.get('uid'),
+        "email": current_user.get('email'),
+        "first_name": current_user.get('firstName', ''),
+        "last_name": current_user.get('lastName', ''),
+        "display_name": current_user.get('displayName', ''),
+        "user_type": current_user.get('userType', 'consumer'),
+        "phone": current_user.get('phone'),
+        "location": current_user.get('location'),
+        "bio": current_user.get('bio'),
+        "join_date": current_user.get('joinDate'),
+        "rating": current_user.get('rating'),
+        "total_reviews": current_user.get('totalReviews', 0),
+        "farmer_profile": current_user.get('farmerProfile'),
+        "consumer_profile": current_user.get('consumerProfile'),
+        "profile_image_url": current_user.get('profileImageUrl')
+    }
+    return frontend_user
 
 @app.put("/profile/", tags=["User Profiles"])
 async def update_profile(profile_data: dict, current_user: dict = Depends(get_current_user)):
@@ -423,16 +627,35 @@ async def update_profile(profile_data: dict, current_user: dict = Depends(get_cu
             "updatedAt": datetime.now()
         }
         
-        # Update basic fields
+        # Convert snake_case to camelCase for frontend compatibility
+        field_mapping = {
+            "first_name": "firstName",
+            "last_name": "lastName", 
+            "user_type": "userType",
+            "display_name": "displayName",
+            "join_date": "joinDate",
+            "total_reviews": "totalReviews",
+            "farmer_profile": "farmerProfile",
+            "consumer_profile": "consumerProfile",
+            "profile_image_url": "profileImageUrl"
+        }
+        
+        # Convert field names and update basic fields
+        for frontend_field, backend_field in field_mapping.items():
+            if frontend_field in profile_data:
+                update_data[backend_field] = profile_data[frontend_field]
+        
+        # Also handle direct camelCase fields
         for field in ["firstName", "lastName", "phone", "location", "bio"]:
             if field in profile_data:
                 update_data[field] = profile_data[field]
         
         # Update display name if first/last name changed
-        if "firstName" in profile_data or "lastName" in profile_data:
-            firstName = profile_data.get("firstName", current_user.get("firstName", ""))
-            lastName = profile_data.get("lastName", current_user.get("lastName", ""))
-            update_data["displayName"] = f"{firstName} {lastName}"
+        firstName = profile_data.get("firstName") or profile_data.get("first_name") or current_user.get("firstName", "")
+        lastName = profile_data.get("lastName") or profile_data.get("last_name") or current_user.get("lastName", "")
+        
+        if "firstName" in profile_data or "lastName" in profile_data or "first_name" in profile_data or "last_name" in profile_data:
+            update_data["displayName"] = f"{firstName} {lastName}".strip()
         
         # Update user-specific profiles
         user_type = current_user.get("userType", "farmer")
@@ -449,12 +672,20 @@ async def update_profile(profile_data: dict, current_user: dict = Depends(get_cu
                         print(f"🔍 Updated farmer field {field}: {profile_data['farmerProfile'][field]}")
             update_data["farmerProfile"] = farmer_profile
         else:
-            consumer_profile = current_user.get("consumerProfile", {})
-            print(f"🔍 Current consumer profile: {consumer_profile}")
+            # Get the most up-to-date consumer profile from the database
+            user_doc = db.collection('users').document(uid).get()
+            current_user_data = user_doc.to_dict() if user_doc.exists else {}
+            consumer_profile = current_user_data.get("consumerProfile", {})
+            print(f"🔍 Current consumer profile from DB: {consumer_profile}")
+            
             if "consumerProfile" in profile_data:
                 print(f"🔍 Updating consumer profile with: {profile_data['consumerProfile']}")
-                # Replace the entire consumer profile, don't merge
-                consumer_profile = profile_data["consumerProfile"]
+                # Merge the consumer profile data instead of replacing
+                for field, value in profile_data["consumerProfile"].items():
+                    if value is not None:  # Only update non-null values
+                        consumer_profile[field] = value
+                        print(f"🔍 Updated consumer field {field}: {value}")
+            # Always preserve the existing consumer profile, even if not updating it
             update_data["consumerProfile"] = consumer_profile
             print(f"🔍 Final consumer profile: {consumer_profile}")
         
@@ -519,10 +750,21 @@ async def update_profile(profile_data: dict, current_user: dict = Depends(get_cu
                 "updatedAt": update_data.get("updatedAt")
             }
             
-            # Also update consumer profile data (including preferences)
+            # Always preserve consumer profile data (including preferences)
+            # Get existing consumer profile and merge with new data
+            existing_consumer_doc = db.collection('consumers').document(uid).get()
+            existing_consumer_data = existing_consumer_doc.to_dict() if existing_consumer_doc.exists else {}
+            existing_consumer_profile = existing_consumer_data.get('consumerProfile', {})
+            
             if "consumerProfile" in update_data:
-                consumer_update_data["consumerProfile"] = update_data["consumerProfile"]
-                print(f"🔍 Adding consumerProfile to consumers collection: {update_data['consumerProfile']}")
+                # Merge existing profile with new profile data
+                merged_consumer_profile = {**existing_consumer_profile, **update_data["consumerProfile"]}
+                consumer_update_data["consumerProfile"] = merged_consumer_profile
+                print(f"🔍 Adding merged consumerProfile to consumers collection: {merged_consumer_profile}")
+            else:
+                # Just preserve the existing consumer profile
+                consumer_update_data["consumerProfile"] = existing_consumer_profile
+                print(f"🔍 Preserving existing consumerProfile: {existing_consumer_profile}")
             
             # Remove None values
             consumer_update_data = {k: v for k, v in consumer_update_data.items() if v is not None}
@@ -548,15 +790,191 @@ async def update_profile(profile_data: dict, current_user: dict = Depends(get_cu
                 updated_user['farmerProfile'] = existing_farmer_profile
                 print(f"🔍 Response - Updated crops: {farmer_data.get('crops', [])}")
         
+        # Convert camelCase to snake_case for frontend compatibility
+        frontend_user = {
+            "uid": updated_user.get('uid'),
+            "email": updated_user.get('email'),
+            "first_name": updated_user.get('firstName', ''),
+            "last_name": updated_user.get('lastName', ''),
+            "display_name": updated_user.get('displayName', ''),
+            "user_type": updated_user.get('userType', 'consumer'),
+            "phone": updated_user.get('phone'),
+            "location": updated_user.get('location'),
+            "bio": updated_user.get('bio'),
+            "join_date": updated_user.get('joinDate'),
+            "rating": updated_user.get('rating'),
+            "total_reviews": updated_user.get('totalReviews', 0),
+            "farmer_profile": updated_user.get('farmerProfile'),
+            "consumer_profile": updated_user.get('consumerProfile'),
+            "profile_image_url": updated_user.get('profileImageUrl')
+        }
+        
         return {
             "message": "Profile updated successfully",
-            "user": updated_user
+            "user": frontend_user
         }
         
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Profile update failed: {str(e)}"
+        )
+
+# ==================== ACCOUNT MANAGEMENT ENDPOINTS ====================
+
+@app.delete("/account/", tags=["Account Management"])
+async def delete_account(current_user: dict = Depends(get_current_user)):
+    """Delete user account and all associated data"""
+    try:
+        uid = current_user['uid']
+        user_type = current_user.get('userType', 'consumer')
+        
+        print(f"🔍 Deleting account for user: {current_user.get('displayName', 'Unknown')} (UID: {uid})")
+        print(f"🔍 User type: {user_type}")
+        
+        # Delete from Firebase Authentication
+        try:
+            auth.delete_user(uid)
+            print(f"✅ Deleted user from Firebase Authentication")
+        except Exception as e:
+            print(f"⚠️ Warning: Could not delete from Firebase Auth: {e}")
+        
+        # Delete from Firestore collections
+        collections_to_clean = ['users']
+        
+        if user_type == 'farmer':
+            collections_to_clean.extend(['farmers', 'listings'])
+        elif user_type == 'consumer':
+            collections_to_clean.extend(['consumers'])
+        
+        # Delete user documents from all relevant collections
+        for collection_name in collections_to_clean:
+            try:
+                if collection_name == 'listings':
+                    # Delete all listings created by this farmer
+                    listings_query = db.collection(collection_name).where('farmerId', '==', uid)
+                    listings_docs = listings_query.stream()
+                    for doc in listings_docs:
+                        doc.reference.delete()
+                        print(f"✅ Deleted listing: {doc.id}")
+                else:
+                    # Delete user document
+                    doc_ref = db.collection(collection_name).document(uid)
+                    if doc_ref.get().exists:
+                        doc_ref.delete()
+                        print(f"✅ Deleted from {collection_name} collection")
+            except Exception as e:
+                print(f"⚠️ Warning: Could not delete from {collection_name}: {e}")
+        
+        # Delete all inquiries related to this user
+        try:
+            # Delete inquiries where user is consumer
+            consumer_inquiries = db.collection('inquiries').where('consumerId', '==', uid).stream()
+            for doc in consumer_inquiries:
+                doc.reference.delete()
+                print(f"✅ Deleted consumer inquiry: {doc.id}")
+            
+            # Delete inquiries where user is farmer
+            farmer_inquiries = db.collection('inquiries').where('farmerId', '==', uid).stream()
+            for doc in farmer_inquiries:
+                doc.reference.delete()
+                print(f"✅ Deleted farmer inquiry: {doc.id}")
+        except Exception as e:
+            print(f"⚠️ Warning: Could not delete inquiries: {e}")
+        
+        # Delete all predictions made by this user
+        try:
+            predictions_query = db.collection('predictions').where('userId', '==', uid)
+            predictions_docs = predictions_query.stream()
+            for doc in predictions_docs:
+                doc.reference.delete()
+                print(f"✅ Deleted prediction: {doc.id}")
+        except Exception as e:
+            print(f"⚠️ Warning: Could not delete predictions: {e}")
+        
+        return {
+            "message": "Account deleted successfully",
+            "deleted_user_id": uid,
+            "user_type": user_type
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete account: {str(e)}"
+        )
+
+@app.post("/account/verify-deletion", tags=["Account Management"])
+async def verify_account_deletion(verification_data: dict, current_user: dict = Depends(get_current_user)):
+    """Verify account deletion with password confirmation"""
+    try:
+        password = verification_data.get('password')
+        if not password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password is required for account deletion"
+            )
+        
+        # Verify password by attempting login
+        email = current_user.get('email')
+        
+        # Try to verify password
+        try:
+            # Find user by email in Firestore
+            users_ref = db.collection('users')
+            query = users_ref.where('email', '==', email).limit(1)
+            docs = query.stream()
+            
+            user_doc = None
+            for doc in docs:
+                user_doc = doc
+                break
+            
+            if not user_doc:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid password"
+                )
+            
+            # Verify password
+            user_data = user_doc.to_dict()
+            stored_password_hash = user_data.get('password')
+            
+            if not stored_password_hash:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid password"
+                )
+            
+            # Hash the provided password and compare
+            import hashlib
+            provided_password_hash = hashlib.sha256(password.encode()).hexdigest()
+            
+            if provided_password_hash != stored_password_hash:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid password"
+                )
+            
+            return {
+                "message": "Password verified successfully",
+                "verified": True
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid password"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Password verification failed: {str(e)}"
         )
 
 # ==================== MARKETPLACE LISTINGS ENDPOINTS ====================

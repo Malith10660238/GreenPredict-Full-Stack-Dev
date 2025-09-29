@@ -337,6 +337,18 @@ class AuthProvider with ChangeNotifier {
         'preferences': preferences,
       };
       
+      // For consumers, preserve existing consumer profile data
+      if (_user!.userType == 'consumer' && _user!.preferences != null) {
+        profileData['consumerProfile'] = {
+          'preferences': _user!.preferences,
+          'favoriteCrops': _user!.favoriteCrops ?? [],
+          'totalOrders': _user!.totalOrders ?? 0,
+          'totalSpent': _user!.totalSpent ?? 0.0,
+          'deliveryAddress': '',
+          'paymentMethod': ''
+        };
+      }
+      
       // Extract first and last name from display name
       final nameParts = displayName.trim().split(' ');
       if (nameParts.isNotEmpty) {
@@ -531,49 +543,17 @@ class AuthProvider with ChangeNotifier {
         final userData = {
           'email': email,
           'password': password,
-          'first_name': firstName,
-          'last_name': lastName,
-          'user_type': userType,
+          'firstName': firstName,
+          'lastName': lastName,
+          'userType': userType,
         };
         
         print('🔵 Attempting registration with data: $userData');
         final response = await _apiService.register(userData);
         print('🔵 Registration response: $response');
         
-        if (response['user'] != null) {
-          final userResponse = response['user'];
-          
-          // Convert backend user data to AppUser
-          _user = AppUser(
-            firstName: userResponse['first_name'],
-            lastName: userResponse['last_name'],
-            displayName: userResponse['display_name'],
-            email: userResponse['email'],
-            uid: userResponse['uid'],
-            userType: userResponse['user_type'],
-            phone: userResponse['phone'],
-            location: userResponse['location'],
-            bio: userResponse['bio'],
-            joinDate: userResponse['join_date'] != null 
-                ? DateTime.parse(userResponse['join_date']) 
-                : DateTime.now(),
-            rating: userResponse['rating']?.toDouble(),
-            totalReviews: userResponse['total_reviews'],
-            // Farmer-specific data
-            farmName: userResponse['farmer_profile']?['farm_name'],
-            farmSize: userResponse['farmer_profile']?['farm_size'],
-            crops: userResponse['farmer_profile']?['crops']?.cast<String>(),
-            farmingExperience: userResponse['farmer_profile']?['farming_experience'],
-            totalListings: userResponse['farmer_profile']?['total_listings'],
-            totalSales: userResponse['farmer_profile']?['total_sales'],
-            certification: userResponse['farmer_profile']?['certification'],
-            // Consumer-specific data
-            preferences: userResponse['consumer_profile']?['preferences']?.cast<String>(),
-            totalOrders: userResponse['consumer_profile']?['total_orders'],
-            totalSpent: userResponse['consumer_profile']?['total_spent']?.toDouble(),
-            favoriteCrops: userResponse['consumer_profile']?['favorite_crops']?.cast<String>(),
-          );
-          
+        if (response['message'] != null) {
+          // Registration successful - don't set user data, force them to sign in
           _setLoading(false);
           return true;
         } else {

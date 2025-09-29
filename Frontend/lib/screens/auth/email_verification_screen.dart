@@ -230,12 +230,13 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Email verified successfully! Welcome to GreenPredict!'),
+          content: Text('Email verified successfully! Please sign in with your credentials.'),
           backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
         ),
       );
-      // Navigate directly to home page
-      Navigator.pushReplacementNamed(context, '/home');
+      // Navigate back to login screen
+      Navigator.pop(context);
     }
   }
 
