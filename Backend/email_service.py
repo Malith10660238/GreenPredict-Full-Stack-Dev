@@ -54,11 +54,11 @@ class EmailService:
                 server.login(self.sender_email, self.sender_password)
                 server.sendmail(self.sender_email, recipient_email, message.as_string())
             
-            print(f"✅ Verification email sent successfully to: {recipient_email}")
+            print(f"SUCCESS: Verification email sent successfully to: {recipient_email}")
             return True
             
         except Exception as e:
-            print(f"❌ Failed to send verification email to {recipient_email}: {str(e)}")
+            print(f"ERROR: Failed to send verification email to {recipient_email}: {str(e)}")
             return False
     
     def _create_verification_email_html(self, verification_code: str, user_name: str) -> str:
