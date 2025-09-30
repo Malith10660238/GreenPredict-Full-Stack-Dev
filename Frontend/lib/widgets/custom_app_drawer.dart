@@ -47,7 +47,13 @@ class CustomAppDrawer extends StatelessWidget {
   Widget _buildDrawerHeader(BuildContext context, AuthProvider authProvider) {
     final user = authProvider.user;
     final profileImage = authProvider.profileImageFile;
+    final profileImageUrl = authProvider.profileImageUrl;
     final isAuthenticated = authProvider.isAuthenticated;
+    
+    // Debug logging
+    print('🔵 AppDrawer - isAuthenticated: $isAuthenticated');
+    print('🔵 AppDrawer - profileImage: $profileImage');
+    print('🔵 AppDrawer - profileImageUrl: $profileImageUrl');
 
     return Container(
       height: 200,
@@ -90,8 +96,10 @@ class CustomAppDrawer extends StatelessWidget {
                       backgroundColor: AppTheme.primaryGreen.withOpacity(0.1),
                       backgroundImage: isAuthenticated && profileImage != null 
                           ? FileImage(profileImage) 
-                          : null,
-                      child: (isAuthenticated && profileImage == null)
+                          : (isAuthenticated && profileImageUrl != null)
+                              ? NetworkImage(profileImageUrl) as ImageProvider
+                              : null,
+                      child: (isAuthenticated && profileImage == null && profileImageUrl == null)
                           ? Text(
                               (user?.displayName?.isNotEmpty == true)
                                   ? user!.displayName![0].toUpperCase()

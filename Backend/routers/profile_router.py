@@ -6,7 +6,7 @@ import base64
 
 from models.user import UserUpdate, UserResponse, FarmerProfile, ConsumerProfile
 from auth_dependencies import get_current_user
-from local_storage_service import local_storage_service
+from storage_service import StorageService
 
 router = APIRouter()
 
@@ -327,7 +327,7 @@ async def upload_profile_image(
     file: UploadFile = File(...),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    """Upload profile image"""
+    """Upload profile image to Firebase Storage"""
     try:
         # Validate file type
         if not file.content_type.startswith('image/'):
@@ -339,8 +339,9 @@ async def upload_profile_image(
         # Read file data
         file_data = await file.read()
         
-        # Upload to local storage
-        image_url = await local_storage_service.upload_profile_image(
+        # Upload to Firebase Storage
+        storage_service = StorageService()
+        image_url = await storage_service.upload_profile_image(
             current_user['uid'],
             file_data,
             file.content_type
@@ -349,7 +350,7 @@ async def upload_profile_image(
         if not image_url:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to upload image"
+                detail="Failed to upload image to Firebase Storage"
             )
         
         # Update user document with image URL
@@ -377,7 +378,7 @@ async def upload_profile_image(
 async def delete_profile_image(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    """Delete profile image"""
+    """Delete profile image from Firebase Storage"""
     try:
         db = firestore.client()
         user_ref = db.collection('users').document(current_user['uid'])
@@ -394,8 +395,9 @@ async def delete_profile_image(
         current_image_url = user_data.get('profile_image_url')
         
         if current_image_url:
-            # Delete from local storage
-            await local_storage_service.delete_image(current_image_url)
+            # Delete from Firebase Storage
+            storage_service = StorageService()
+            await storage_service.delete_profile_image(current_image_url)
         
         # Remove image URL from user document
         user_ref.update({

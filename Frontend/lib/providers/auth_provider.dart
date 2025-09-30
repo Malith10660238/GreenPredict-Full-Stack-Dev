@@ -176,13 +176,17 @@ class AuthProvider with ChangeNotifier {
         print('🔵 Auto-uploading profile image: ${_profileImageFile!.path}');
         final imageResponse = await _apiService.uploadProfileImage(_profileImageFile!, _authToken!);
         print('🔵 Auto-upload response: $imageResponse');
+        print('🔵 Response keys: ${imageResponse.keys}');
+        print('🔵 image_url value: ${imageResponse['image_url']}');
         if (imageResponse['image_url'] != null) {
           _profileImageUrl = imageResponse['image_url'];
           print('🔵 Profile image URL updated: $_profileImageUrl');
+          print('🔵 Profile image URL type: ${_profileImageUrl.runtimeType}');
           notifyListeners();
           _setError(null); // Clear any previous errors
         } else {
           print('❌ Auto-upload response missing image_url');
+          print('❌ Available keys: ${imageResponse.keys}');
           _setError('Failed to save profile image. Please try again.');
         }
       } catch (e) {
@@ -193,9 +197,38 @@ class AuthProvider with ChangeNotifier {
   }
 
   // --- NEW: Method to remove profile image ---
-  void removeProfileImage() {
-    _profileImageFile = null;
-    notifyListeners();
+  Future<void> removeProfileImage() async {
+    if (_authToken == null) {
+      _setError('Authentication required. Please login again.');
+      return;
+    }
+
+    try {
+      _setLoading(true);
+      _setError(null);
+      
+      print('🔵 Removing profile image...');
+      
+      // Call backend API to delete the image
+      final response = await _apiService.deleteProfileImage(_authToken!);
+      print('🔵 Delete image response: $response');
+      
+      if (response['message'] != null) {
+        // Clear local state
+        _profileImageFile = null;
+        _profileImageUrl = null;
+        print('✅ Profile image removed successfully');
+        notifyListeners();
+      } else {
+        _setError('Failed to remove profile image');
+      }
+      
+      _setLoading(false);
+    } catch (e) {
+      _setLoading(false);
+      print('❌ Failed to remove profile image: $e');
+      _setError('Failed to remove profile image. Please try again.');
+    }
   }
 
   // --- NEW: Method to update preferences only ---
@@ -510,10 +543,16 @@ class AuthProvider with ChangeNotifier {
           );
           
           // Handle profile image if provided
+          print('🔵 Login - profileImageUrl from backend: ${userData['profileImageUrl']}');
+          print('🔵 Login - profile_image_url from backend: ${userData['profile_image_url']}');
           if (userData['profileImageUrl'] != null) {
             _profileImageUrl = userData['profileImageUrl'];
+            print('🔵 Login - Set profileImageUrl: $_profileImageUrl');
           } else if (userData['profile_image_url'] != null) {
             _profileImageUrl = userData['profile_image_url'];
+            print('🔵 Login - Set profileImageUrl from snake_case: $_profileImageUrl');
+          } else {
+            print('🔵 Login - No profile image URL found in backend response');
           }
           
           // Notify listeners that user data has been set

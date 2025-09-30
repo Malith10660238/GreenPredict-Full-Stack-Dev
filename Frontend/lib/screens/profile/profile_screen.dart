@@ -645,15 +645,17 @@ void _showImageOptions(BuildContext context, AuthProvider authProvider) {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              authProvider.removeProfileImage();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Profile picture removed'),
-                  backgroundColor: AppTheme.primaryGreen,
-                ),
-              );
+              await authProvider.removeProfileImage();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Profile picture removed'),
+                    backgroundColor: AppTheme.primaryGreen,
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Remove'),

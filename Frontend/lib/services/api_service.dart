@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 class ApiService {
   // FastAPI backend URL
@@ -241,16 +242,29 @@ class ApiService {
     String token,
   ) async {
     try {
+      print('🔵 Uploading profile image: ${imageFile.path}');
+      print('🔵 File exists: ${await imageFile.exists()}');
+      print('🔵 File size: ${await imageFile.length()}');
+      
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('$baseUrl$_profileEndpoint/upload-image'),
+        Uri.parse('$baseUrl/profile/upload-image'),
       );
       
       request.headers.addAll(_authHeaders(token));
-      request.files.add(await http.MultipartFile.fromPath(
+      
+      // Create multipart file with explicit content type
+      var multipartFile = await http.MultipartFile.fromPath(
         'file',
         imageFile.path,
-      ));
+        contentType: MediaType('image', 'jpeg'), // Explicitly set content type
+      );
+      
+      print('🔵 Multipart file content type: ${multipartFile.contentType}');
+      print('🔵 Multipart file field: ${multipartFile.field}');
+      print('🔵 Multipart file filename: ${multipartFile.filename}');
+      
+      request.files.add(multipartFile);
       
       var response = await request.send();
       var responseBody = await response.stream.bytesToString();
@@ -270,7 +284,7 @@ class ApiService {
   Future<Map<String, dynamic>> deleteProfileImage(String token) async {
     try {
       final response = await http.delete(
-        Uri.parse('$baseUrl$_profileEndpoint/image'),
+        Uri.parse('$baseUrl/profile/image'),
         headers: _authHeaders(token),
       );
       

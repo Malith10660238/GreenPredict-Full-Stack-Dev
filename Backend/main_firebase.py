@@ -2,9 +2,10 @@
 Complete Firebase-integrated backend for GreenPredict
 Stores all user data, marketplace listings, and interactions in Firebase
 """
-from fastapi import FastAPI, HTTPException, Depends, status, Query
+from fastapi import FastAPI, HTTPException, Depends, status, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
 import uvicorn
@@ -42,7 +43,9 @@ def initialize_firebase():
             service_account_path = "serviceAccountKey.json"
             if os.path.exists(service_account_path):
                 cred = credentials.Certificate(service_account_path)
+                # Initialize Firebase Admin SDK
                 firebase_admin.initialize_app(cred)
+                print("✅ Firebase initialized successfully")
             else:
                 firebase_admin.initialize_app()
         except Exception as e:
@@ -155,6 +158,9 @@ async def health_check():
 
 # Include routers
 app.include_router(prediction_router, prefix="/predictions", tags=["predictions"])
+
+# Mount static files for serving uploaded images
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # ==================== AUTHENTICATION ENDPOINTS ====================
 
@@ -570,7 +576,8 @@ async def login(login_data: dict):
                 "total_reviews": user_data.get('totalReviews', 0),
                 "farmer_profile": user_data.get('farmerProfile'),
                 "consumer_profile": user_data.get('consumerProfile'),
-                "profile_image_url": user_data.get('profileImageUrl')
+                "profile_image_url": user_data.get('profileImageUrl'),
+                "profileImageUrl": user_data.get('profileImageUrl')
             }
         }
         
@@ -653,7 +660,8 @@ async def google_auth(google_data: dict):
                     "total_reviews": user_data.get('totalReviews', 0),
                     "farmer_profile": user_data.get('farmerProfile'),
                     "consumer_profile": user_data.get('consumerProfile'),
-                    "profile_image_url": user_data.get('profileImageUrl')
+                    "profile_image_url": user_data.get('profileImageUrl'),
+                    "profileImageUrl": user_data.get('profileImageUrl')
                 }
             }
         else:
@@ -792,7 +800,8 @@ async def get_profile(current_user: dict = Depends(get_current_user)):
         "total_reviews": current_user.get('totalReviews', 0),
         "farmer_profile": current_user.get('farmerProfile'),
         "consumer_profile": current_user.get('consumerProfile'),
-        "profile_image_url": current_user.get('profileImageUrl')
+        "profile_image_url": current_user.get('profileImageUrl'),
+        "profileImageUrl": current_user.get('profileImageUrl')
     }
     return frontend_user
 
@@ -997,7 +1006,8 @@ async def update_profile(profile_data: dict, current_user: dict = Depends(get_cu
             "total_reviews": updated_user.get('totalReviews', 0),
             "farmer_profile": updated_user.get('farmerProfile'),
             "consumer_profile": updated_user.get('consumerProfile'),
-            "profile_image_url": updated_user.get('profileImageUrl')
+            "profile_image_url": updated_user.get('profileImageUrl'),
+            "profileImageUrl": updated_user.get('profileImageUrl')
         }
         
         return {
@@ -1009,6 +1019,166 @@ async def update_profile(profile_data: dict, current_user: dict = Depends(get_cu
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Profile update failed: {str(e)}"
+        )
+
+@app.post("/profile/upload-image", tags=["User Profiles"])
+async def upload_profile_image(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload profile image to Firebase Storage"""
+    try:
+        # Validate file type - be more flexible with content type detection
+        print(f"🔵 File content type: {file.content_type}")
+        print(f"🔵 File filename: {file.filename}")
+        
+        # Check if it's an image by content type or filename
+        is_image = False
+        if file.content_type and file.content_type.startswith('image/'):
+            is_image = True
+        elif file.filename:
+            # Check by file extension
+            image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
+            file_ext = file.filename.lower()
+            for ext in image_extensions:
+                if file_ext.endswith(ext):
+                    is_image = True
+                    break
+        
+        if not is_image:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File must be an image"
+            )
+        
+        # Read file data
+        file_data = await file.read()
+        print(f"🔵 File data size: {len(file_data)} bytes")
+        
+        # Generate unique filename - be more flexible with extension detection
+        file_extension = "jpg"  # Default to jpg
+        if file.content_type:
+            if "jpeg" in file.content_type or "jpg" in file.content_type:
+                file_extension = "jpg"
+            elif "png" in file.content_type:
+                file_extension = "png"
+            elif "gif" in file.content_type:
+                file_extension = "gif"
+        elif file.filename:
+            # Determine extension from filename
+            if file.filename.lower().endswith('.png'):
+                file_extension = "png"
+            elif file.filename.lower().endswith('.gif'):
+                file_extension = "gif"
+        
+        filename = f"profile_images/{current_user['uid']}/{uuid.uuid4()}.{file_extension}"
+        print(f"🔵 Generated filename: {filename}")
+        
+        # Save to local storage (like listing images)
+        import os
+        upload_dir = "uploads/profile_images"
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Save file locally
+        local_file_path = os.path.join(upload_dir, f"{current_user['uid']}_{uuid.uuid4()}.{file_extension}")
+        with open(local_file_path, "wb") as f:
+            f.write(file_data)
+        
+        # Create URL for local file
+        image_url = f"http://10.0.2.2:8001/{local_file_path.replace(os.sep, '/')}"
+        
+        # Update user document with image URL
+        uid = current_user['uid']
+        print(f"🔵 Updating profile image for user: {uid}")
+        print(f"🔵 Image URL: {image_url}")
+        user_ref = db.collection('users').document(uid)
+        user_ref.update({
+            'profileImageUrl': image_url,
+            'updatedAt': datetime.now()
+        })
+        print(f"✅ Updated users collection with profileImageUrl")
+        
+        # Also update the type-specific collection
+        user_type = current_user.get('userType', 'consumer')
+        if user_type == 'farmer':
+            farmer_ref = db.collection('farmers').document(uid)
+            farmer_ref.update({
+                'profileImageUrl': image_url,
+                'updatedAt': datetime.now()
+            })
+            print(f"✅ Updated farmers collection with profileImageUrl")
+        elif user_type == 'consumer':
+            consumer_ref = db.collection('consumers').document(uid)
+            consumer_ref.update({
+                'profileImageUrl': image_url,
+                'updatedAt': datetime.now()
+            })
+            print(f"✅ Updated consumers collection with profileImageUrl")
+        
+        return {
+            "message": "Profile image uploaded successfully",
+            "image_url": image_url
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload profile image: {str(e)}"
+        )
+
+@app.delete("/profile/image", tags=["User Profiles"])
+async def delete_profile_image(
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete profile image from Firebase Storage"""
+    try:
+        uid = current_user['uid']
+        current_image_url = current_user.get('profileImageUrl')
+        
+        if current_image_url:
+            try:
+                # Delete local file
+                import os
+                if "uploads/profile_images" in current_image_url:
+                    local_file_path = current_image_url.replace("http://10.0.2.2:8001/", "")
+                    if os.path.exists(local_file_path):
+                        os.remove(local_file_path)
+                        print(f"✅ Deleted local profile image: {local_file_path}")
+            except Exception as e:
+                print(f"Warning: Could not delete local image: {e}")
+        
+        # Remove image URL from user documents
+        user_ref = db.collection('users').document(uid)
+        user_ref.update({
+            'profileImageUrl': None,
+            'updatedAt': datetime.now()
+        })
+        
+        # Also update the type-specific collection
+        user_type = current_user.get('userType', 'consumer')
+        if user_type == 'farmer':
+            farmer_ref = db.collection('farmers').document(uid)
+            farmer_ref.update({
+                'profileImageUrl': None,
+                'updatedAt': datetime.now()
+            })
+        elif user_type == 'consumer':
+            consumer_ref = db.collection('consumers').document(uid)
+            consumer_ref.update({
+                'profileImageUrl': None,
+                'updatedAt': datetime.now()
+            })
+        
+        return {"message": "Profile image deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete profile image: {str(e)}"
         )
 
 # ==================== ACCOUNT MANAGEMENT ENDPOINTS ====================
