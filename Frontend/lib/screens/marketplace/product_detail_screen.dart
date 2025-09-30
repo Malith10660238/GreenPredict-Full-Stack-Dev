@@ -8,13 +8,15 @@ import '../../utils/date_utils.dart' as app_date;
 import '../../services/api_service.dart';
 
 class ProductDetailScreen extends StatefulWidget {
-  final Map<String, dynamic> listing;
-  final VoidCallback onChatTap;
+  final String? listingId;
+  final Map<String, dynamic>? listing;
+  final VoidCallback? onChatTap;
   
   const ProductDetailScreen({
     super.key,
-    required this.listing,
-    required this.onChatTap,
+    this.listingId,
+    this.listing,
+    this.onChatTap,
   });
 
   @override
@@ -26,8 +28,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final ApiService _apiService = ApiService();
   int _currentImageIndex = 0;
 
-  // TODO: Fetch real farmer's other products from API
-  final List<Map<String, dynamic>> _otherProducts = [];
+  Map<String, dynamic>? _currentListing;
+  List<Map<String, dynamic>> _otherProducts = [];
+  bool _isLoadingOtherProducts = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeData();
+  }
 
   @override
   void dispose() {
@@ -35,8 +45,125 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.dispose();
   }
 
+  Future<void> _initializeData() async {
+    // Set current listing
+    if (widget.listing != null) {
+      _currentListing = widget.listing;
+    } else if (widget.listingId != null) {
+      // Fetch listing by ID if needed
+      try {
+        final listing = await _apiService.getListingById(widget.listingId!);
+        if (listing != null) {
+          _currentListing = listing;
+        }
+      } catch (e) {
+        setState(() {
+          _errorMessage = 'Failed to load listing: $e';
+        });
+        return;
+      }
+    }
+
+    if (_currentListing != null) {
+      await _loadOtherProducts();
+    }
+  }
+
+  Future<void> _loadOtherProducts() async {
+    if (_currentListing == null) return;
+
+    setState(() {
+      _isLoadingOtherProducts = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final farmerId = _currentListing!['farmerId'] ?? _currentListing!['farmer_id'];
+      if (farmerId != null) {
+        final otherProducts = await _apiService.getFarmerListings(farmerId.toString());
+        
+        // Filter out the current listing
+        _otherProducts = otherProducts.where((product) {
+          final productId = product['id'] ?? product['listingId'];
+          final currentId = _currentListing!['id'] ?? _currentListing!['listingId'];
+          return productId != currentId;
+        }).toList();
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load other products: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingOtherProducts = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_errorMessage != null) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: const Text('Error'),
+          backgroundColor: Colors.white,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Colors.red.withOpacity(0.6),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Failed to load product',
+                style: AppTheme.heading2.copyWith(
+                  color: AppTheme.textDark,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _errorMessage!,
+                style: AppTheme.bodyMedium.copyWith(
+                  color: AppTheme.darkGray,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _errorMessage = null;
+                  });
+                  _initializeData();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryGreen,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_currentListing == null) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: CustomScrollView(
@@ -67,7 +194,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildImageGalleryAppBar() {
-    final images = widget.listing['images'] as List<dynamic>? ?? [];
+    final images = _currentListing!['images'] as List<dynamic>? ?? [];
+    
+    // Debug logging for main product images
+    print('🔵 Main Product Images: $images');
+    print('🔵 Main Product Images Length: ${images.length}');
+    if (images.isNotEmpty) {
+      print('🔵 First Image: ${images.first}');
+      for (int i = 0; i < images.length; i++) {
+        print('🔵 Image $i: ${images[i]}');
+      }
+    }
     
     return SliverAppBar(
       expandedHeight: 300,
@@ -87,7 +224,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       actions: [
         Consumer2<ListingProvider, AuthProvider>(
           builder: (context, listingProvider, authProvider, child) {
-            final listingId = widget.listing['id']?.toString() ?? '';
+            final listingId = _currentListing!['id']?.toString() ?? '';
             final isFavorite = listingProvider.isFavorite(listingId, authProvider.user?.uid);
             
             return Container(
@@ -146,17 +283,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 },
                 itemCount: images.length,
                 itemBuilder: (context, index) {
-                  return _buildProductImage(images[index]);
+                  final imageData = images[index];
+                  final imageUrl = imageData != null ? imageData.toString() : null;
+                  print('🔵 Main Gallery - Index $index: $imageUrl');
+                  return _buildProductImage(imageUrl, [imageData]);
                 },
               )
             else
               Container(
-                color: AppTheme.lightGray,
+                decoration: BoxDecoration(
+                  color: AppTheme.lightGray,
+                ),
                 child: const Center(
-                  child: Icon(
-                    Icons.image,
-                    size: 80,
-                    color: AppTheme.mediumGray,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.image_outlined,
+                        size: 80,
+                        color: AppTheme.mediumGray,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'No Images Available',
+                        style: TextStyle(
+                          color: AppTheme.mediumGray,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -198,7 +353,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           children: [
             Expanded(
               child: Text(
-                widget.listing['cropName']?.toString() ?? 'Product Name',
+                _currentListing!['cropName']?.toString() ?? 'Product Name',
                 style: AppTheme.heading2.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
@@ -214,7 +369,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 const SizedBox(width: 12),
                 Consumer2<ListingProvider, AuthProvider>(
                   builder: (context, listingProvider, authProvider, child) {
-                    final listingId = widget.listing['id']?.toString() ?? '';
+                    final listingId = _currentListing!['id']?.toString() ?? '';
                     final isFavorite = listingProvider.isFavorite(listingId, authProvider.user?.uid);
                     
                     return GestureDetector(
@@ -262,7 +417,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              'Rs. ${widget.listing['price']?.toString() ?? '0'}/kg',
+              'Rs. ${_currentListing!['price']?.toString() ?? '0'}/kg',
               style: AppTheme.heading2.copyWith(
                 color: AppTheme.primaryGreen,
                 fontWeight: FontWeight.bold,
@@ -270,7 +425,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
             const SizedBox(width: 12),
             Text(
-              '${widget.listing['quantity']?.toString() ?? '0'} kg available',
+              '${_currentListing!['quantity']?.toString() ?? '0'} kg available',
               style: AppTheme.bodyMedium.copyWith(color: AppTheme.darkGray),
             ),
           ],
@@ -286,13 +441,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Color(app_date.AppDateUtils.getFreshnessColor(widget.listing['manufacturedDate'])).withOpacity(0.1),
-                Color(app_date.AppDateUtils.getFreshnessColor(widget.listing['manufacturedDate'])).withOpacity(0.05),
+                Color(app_date.AppDateUtils.getFreshnessColor(_currentListing!['manufacturedDate'])).withOpacity(0.1),
+                Color(app_date.AppDateUtils.getFreshnessColor(_currentListing!['manufacturedDate'])).withOpacity(0.05),
               ],
             ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: Color(app_date.AppDateUtils.getFreshnessColor(widget.listing['manufacturedDate'])).withOpacity(0.3),
+              color: Color(app_date.AppDateUtils.getFreshnessColor(_currentListing!['manufacturedDate'])).withOpacity(0.3),
               width: 2,
             ),
           ),
@@ -301,12 +456,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Color(app_date.AppDateUtils.getFreshnessColor(widget.listing['manufacturedDate'])).withOpacity(0.2),
+                  color: Color(app_date.AppDateUtils.getFreshnessColor(_currentListing!['manufacturedDate'])).withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   Icons.schedule,
-                  color: Color(app_date.AppDateUtils.getFreshnessColor(widget.listing['manufacturedDate'])),
+                  color: Color(app_date.AppDateUtils.getFreshnessColor(_currentListing!['manufacturedDate'])),
                   size: 24,
                 ),
               ),
@@ -325,15 +480,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      app_date.AppDateUtils.getRelativeTime(widget.listing['manufacturedDate']),
+                      app_date.AppDateUtils.getRelativeTime(_currentListing!['manufacturedDate']),
                       style: AppTheme.heading3.copyWith(
-                        color: Color(app_date.AppDateUtils.getFreshnessColor(widget.listing['manufacturedDate'])),
+                        color: Color(app_date.AppDateUtils.getFreshnessColor(_currentListing!['manufacturedDate'])),
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
                       ),
                     ),
                     Text(
-                      app_date.AppDateUtils.formatDate(widget.listing['manufacturedDate']),
+                      app_date.AppDateUtils.formatDate(_currentListing!['manufacturedDate']),
                       style: AppTheme.bodySmall.copyWith(
                         color: AppTheme.darkGray,
                         fontSize: 11,
@@ -345,11 +500,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Color(app_date.AppDateUtils.getFreshnessColor(widget.listing['manufacturedDate'])),
+                  color: Color(app_date.AppDateUtils.getFreshnessColor(_currentListing!['manufacturedDate'])),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  app_date.AppDateUtils.getFreshnessStatus(widget.listing['manufacturedDate']),
+                  app_date.AppDateUtils.getFreshnessStatus(_currentListing!['manufacturedDate']),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -367,12 +522,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             const Icon(Icons.location_on, color: AppTheme.darkGray, size: 16),
             const SizedBox(width: 4),
             Text(
-              widget.listing['location']?.toString() ?? 'Location',
+              _currentListing!['location']?.toString() ?? 'Location',
               style: AppTheme.bodyMedium.copyWith(color: AppTheme.darkGray),
             ),
           ],
         ),
-        if (widget.listing['isOrganic'] == true)
+        if (_currentListing!['isOrganic'] == true)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Container(
@@ -416,7 +571,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             radius: 25,
             backgroundColor: AppTheme.primaryGreen,
             child: Text(
-              (widget.listing['farmerName']?.toString() ?? 'F')[0].toUpperCase(),
+              (_currentListing!['farmerName']?.toString() ?? 'F')[0].toUpperCase(),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 20,
@@ -430,7 +585,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.listing['farmerName']?.toString() ?? 'Farmer Name',
+                  _currentListing!['farmerName']?.toString() ?? 'Farmer Name',
                   style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
@@ -467,7 +622,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
         const SizedBox(height: 12),
         Text(
-          widget.listing['description']?.toString() ?? 
+          _currentListing!['description']?.toString() ?? 
           'Fresh, high-quality produce grown with care using sustainable farming practices. Harvested at peak freshness to ensure the best taste and nutritional value.',
           style: AppTheme.bodyMedium.copyWith(height: 1.6),
         ),
@@ -492,10 +647,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
           child: Column(
             children: [
-              _buildDetailRow('Category', widget.listing['category']?.toString() ?? 'Vegetable'),
-              _buildDetailRow('Origin', widget.listing['location']?.toString() ?? 'Sri Lanka'),
+              _buildDetailRow('Category', _currentListing!['category']?.toString() ?? 'Vegetable'),
+              _buildDetailRow('Origin', _currentListing!['location']?.toString() ?? 'Sri Lanka'),
               _buildDetailRow('Harvest Date', 'Recent'),
-              _buildDetailRow('Certification', widget.listing['isOrganic'] == true ? 'Organic' : 'Standard'),
+              _buildDetailRow('Certification', _currentListing!['isOrganic'] == true ? 'Organic' : 'Standard'),
               _buildDetailRow('Storage', 'Keep refrigerated'),
             ],
           ),
@@ -524,16 +679,55 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildOtherProducts() {
+    if (_isLoadingOtherProducts) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'More from this Farmer',
+            style: AppTheme.heading3.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 120,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: 3,
+              itemBuilder: (context, index) {
+                return Container(
+                  width: 140,
+                  margin: const EdgeInsets.only(right: 12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.lightGray,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_otherProducts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'More from this Farmer',
+          'More from this Farmer (${_otherProducts.length})',
           style: AppTheme.heading3.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 120,
+          height: 160,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: _otherProducts.length,
@@ -548,145 +742,231 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
     
   Widget _buildOtherProductCard(Map<String, dynamic> product) {
-    return Container(
-      width: 140,
-      margin: const EdgeInsets.only(right: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.mediumGray),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Container(
-              decoration: const BoxDecoration(
-                color: AppTheme.lightGray,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
-                ),
-              ),
-              child: const Center(
-                child: Icon(Icons.image, color: AppTheme.darkGray, size: 30),
-              ),
+    final images = product['images'] as List<dynamic>? ?? [];
+    String? imageUrl;
+    
+    // Better image URL extraction with validation
+    if (images.isNotEmpty) {
+      final firstImage = images.first;
+      if (firstImage != null && firstImage.toString().isNotEmpty && 
+          firstImage.toString().trim().isNotEmpty &&
+          firstImage.toString() != 'null' && firstImage.toString() != 'undefined') {
+        imageUrl = firstImage.toString();
+      }
+    }
+    
+    // Debug logging
+    print('🔵 Product: ${product['cropName']} - Images: $images');
+    print('🔵 Image URL: $imageUrl');
+    
+    // Handle local file paths - keep them for proper display
+    if (imageUrl != null && imageUrl.startsWith('/data/')) {
+      print('🔵 Local file path detected, will handle in _buildProductImage');
+      // Don't convert to null - let _buildProductImage handle it
+    }
+    
+    return GestureDetector(
+      onTap: () {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailScreen(
+              listing: product,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product['cropName'],
-                  style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w600),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  'Rs. ${product['price']}/kg',
-                  style: AppTheme.caption.copyWith(
-                    color: AppTheme.primaryGreen,
-                    fontWeight: FontWeight.w600,
+        );
+      },
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.mediumGray),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.lightGray,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
                   ),
                 ),
-              ],
+                child: _buildProductImage(imageUrl, images),
+              ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product['cropName'] ?? 'Product',
+                    style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Rs. ${(product['price'] ?? 0).toStringAsFixed(0)}/kg',
+                    style: AppTheme.caption.copyWith(
+                      color: AppTheme.primaryGreen,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (product['isOrganic'] == true) ...[
+                    const SizedBox(height: 2),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryGreen.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(
+                        'Organic',
+                        style: AppTheme.caption.copyWith(
+                          color: AppTheme.primaryGreen,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildProductImage(dynamic imageData) {
-    if (imageData is String) {
-      if (imageData.startsWith('http')) {
-        // Network image
-        return Image.network(
-          imageData,
+  Widget _buildProductImage(String? imageUrl, List<dynamic> images) {
+    try {
+      // Debug logging
+      print('🔵 _buildProductImage called with:');
+      print('🔵   imageUrl: $imageUrl');
+      print('🔵   images: $images');
+      print('🔵   imageUrl type: ${imageUrl.runtimeType}');
+      print('🔵   images length: ${images.length}');
+      
+      // Early validation - only for truly invalid data
+      if (imageUrl == null || imageUrl.isEmpty || imageUrl.trim().isEmpty || 
+          imageUrl == 'null' || imageUrl == 'undefined') {
+        print('🔵 No valid image data, using placeholder immediately');
+        return _buildPlaceholderImage();
+      }
+      
+      // Only reject obvious placeholder URLs, not all URLs with 'placeholder'
+      if (imageUrl.contains('placeholder_crop.jpg') || 
+          imageUrl.contains('default.jpg') || 
+          imageUrl.contains('missing.jpg')) {
+        print('🔵 Placeholder URL detected, using placeholder');
+        return _buildPlaceholderImage();
+      }
+    
+    // Check if we have a valid network URL
+    if (imageUrl.startsWith('http')) {
+      print('🔵 Using network image: $imageUrl');
+      return ClipRRect(
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(12),
+          topRight: Radius.circular(12),
+        ),
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
-          fit: BoxFit.cover,
           loadingBuilder: (context, child, loadingProgress) {
             if (loadingProgress == null) return child;
-            return const Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
-              ),
-            );
+            return _buildPlaceholderImage();
           },
           errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: AppTheme.lightGray,
-              child: const Center(
-                child: Icon(
-                  Icons.image,
-                  size: 80,
-                  color: AppTheme.darkGray,
-                ),
-              ),
-            );
+            print('🔵 Network image failed to load: $error');
+            return _buildPlaceholderImage();
           },
-        );
-      } else {
-        // Local file path
-        final file = File(imageData);
-        if (file.existsSync()) {
-          return Image.file(
-            file,
-            width: double.infinity,
-            height: double.infinity,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: AppTheme.lightGray,
-                child: const Center(
-                  child: Icon(
-                    Icons.image,
-                    size: 80,
-                    color: AppTheme.darkGray,
-                  ),
-                ),
-              );
-            },
-          );
-        } else {
-          // File doesn't exist, show placeholder
-          return Container(
-            color: AppTheme.lightGray,
-            child: const Center(
-              child: Icon(
-                Icons.image,
-                size: 80,
-                color: AppTheme.darkGray,
-              ),
-            ),
-          );
-        }
-      }
-    } else {
-      // Fallback for unknown image types
-      return Container(
-        color: AppTheme.lightGray,
-        child: const Center(
-          child: Icon(
-            Icons.image,
-            size: 80,
-            color: AppTheme.darkGray,
-          ),
         ),
       );
     }
+    
+    // Check for local file paths
+    if (images.isNotEmpty) {
+      final firstImage = images.first.toString();
+      print('🔵 Checking local file: $firstImage');
+      if (firstImage.startsWith('/data/')) {
+        print('🔵 Using local file: $firstImage');
+        return ClipRRect(
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(12),
+            topRight: Radius.circular(12),
+          ),
+          child: Image.file(
+            File(firstImage),
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (context, error, stackTrace) {
+              print('🔵 Local file failed to load: $error');
+              return _buildPlaceholderImage();
+            },
+          ),
+        );
+      }
+    }
+    
+    // If we get here, no valid image found - use placeholder
+    print('🔵 No valid image found - using placeholder');
+    return _buildPlaceholderImage();
+    
+    } catch (e) {
+      print('🔵 Error in _buildProductImage: $e');
+      return _buildPlaceholderImage();
+    }
   }
+
+  Widget _buildPlaceholderImage() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.lightGray,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(12),
+          topRight: Radius.circular(12),
+        ),
+      ),
+      child: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.image_outlined,
+              color: AppTheme.mediumGray,
+              size: 40,
+            ),
+            SizedBox(height: 4),
+            Text(
+              'No Image',
+              style: TextStyle(
+                color: AppTheme.mediumGray,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildChatButton(BuildContext context) {
     return Consumer<AuthProvider>(
@@ -697,7 +977,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         // 3. User is viewing their own listing
         if (!authProvider.isAuthenticated || 
             authProvider.isFarmer || 
-            authProvider.user?.uid == widget.listing['farmerId']) {
+            authProvider.user?.uid == _currentListing!['farmerId']) {
           return const SizedBox.shrink(); // Return empty widget to hide button
         }
 
@@ -781,12 +1061,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Send a message to ${widget.listing['farmerName'] ?? 'the farmer'} about this product:',
+              'Send a message to ${_currentListing!['farmerName'] ?? 'the farmer'} about this product:',
               style: AppTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
             Text(
-              widget.listing['title'] ?? 'Product',
+              _currentListing!['title'] ?? 'Product',
               style: AppTheme.bodyLarge.copyWith(
                 fontWeight: FontWeight.w600,
                 color: AppTheme.primaryGreen,
@@ -847,8 +1127,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     // Close dialog immediately
     Navigator.pop(dialogContext);
     
-    final farmerId = widget.listing['farmerId']?.toString();
-    final productId = widget.listing['id']?.toString();
+    final farmerId = _currentListing!['farmerId']?.toString();
+    final productId = _currentListing!['id']?.toString();
     
     if (farmerId == null || productId == null) {
       ScaffoldMessenger.of(mainContext).showSnackBar(

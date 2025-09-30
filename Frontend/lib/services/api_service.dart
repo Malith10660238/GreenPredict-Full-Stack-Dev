@@ -116,6 +116,52 @@ class ApiService {
       throw Exception('Network error: $e');
     }
   }
+
+  Future<List<Map<String, dynamic>>> getFarmerListings(String farmerId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl$_listingsEndpoint/farmer/$farmerId'),
+        headers: _headers,
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> responseData = jsonDecode(response.body);
+        final listings = List<Map<String, dynamic>>.from(responseData);
+        
+        // Debug logging
+        print('🔵 API Service - Received ${listings.length} listings');
+        for (int i = 0; i < listings.length; i++) {
+          final listing = listings[i];
+          print('🔵 API Service - Listing ${i+1}: ${listing['cropName']} - Images: ${listing['images']}');
+        }
+        
+        return listings;
+      } else {
+        throw Exception('Failed to fetch farmer listings: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> getListingById(String listingId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl$_listingsEndpoint/$listingId'),
+        headers: _headers,
+      );
+      
+      if (response.statusCode == 200) {
+        return Map<String, dynamic>.from(jsonDecode(response.body));
+      } else if (response.statusCode == 404) {
+        return null;
+      } else {
+        throw Exception('Failed to fetch listing: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
   
   Future<Map<String, dynamic>> createListing(
     Map<String, dynamic> listingData,

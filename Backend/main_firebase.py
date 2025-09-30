@@ -1514,6 +1514,72 @@ async def get_my_listings(current_user: dict = Depends(get_current_user)):
             detail=f"Failed to fetch user listings: {str(e)}"
         )
 
+@app.get("/listings/farmer/{farmer_id}", tags=["Marketplace"])
+async def get_farmer_listings(
+    farmer_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0)
+):
+    """Get all listings by a specific farmer"""
+    try:
+        print(f"🔵 Fetching listings for farmer: {farmer_id}")
+        
+        # Query listings by farmer ID
+        listings_ref = db.collection('listings')
+        query = listings_ref.where('farmerId', '==', farmer_id)
+        
+        listings = []
+        for doc in query.stream():
+            listing_data = doc.to_dict()
+            listing_data['id'] = doc.id
+            listings.append(listing_data)
+        
+        print(f"🔵 Found {len(listings)} listings for farmer {farmer_id}")
+        
+        # Debug: Print image URLs for each listing
+        for i, listing in enumerate(listings):
+            images = listing.get('images', [])
+            print(f"🔵 Listing {i+1}: {listing.get('crop_name', 'Unknown')} - Images: {images}")
+            
+            # If no images or invalid images, add a default placeholder image
+            if not images or len(images) == 0 or not any(img for img in images if img and img.strip()):
+                # Use a default placeholder image
+                default_image_url = "http://10.0.2.2:8001/uploads/placeholder_crop.jpg"
+                listing['images'] = [default_image_url]
+                print(f"🔵 Added default placeholder image: {default_image_url}")
+            else:
+                # Check if existing images are valid URLs
+                valid_images = []
+                for img in images:
+                    if img and img.strip() and (img.startswith('http') or img.startswith('/')):
+                        valid_images.append(img)
+                    else:
+                        print(f"🔵 Invalid image URL: {img}")
+                
+                if not valid_images:
+                    # No valid images, use placeholder
+                    default_image_url = "http://10.0.2.2:8001/uploads/placeholder_crop.jpg"
+                    listing['images'] = [default_image_url]
+                    print(f"🔵 No valid images found, using placeholder: {default_image_url}")
+                else:
+                    listing['images'] = valid_images
+                    print(f"🔵 Using valid images: {valid_images}")
+        
+        # Sort by creation date (newest first)
+        listings.sort(key=lambda x: x.get('createdAt', datetime.now()), reverse=True)
+        
+        # Apply pagination
+        paginated_listings = listings[offset:offset + limit]
+        
+        return paginated_listings
+        
+    except Exception as e:
+        print(f"❌ Error fetching farmer listings: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch farmer listings: {str(e)}"
+        )
+
 @app.put("/listings/{listing_id}", tags=["Marketplace"])
 async def update_listing(listing_id: str, listing_data: dict, current_user: dict = Depends(get_current_user)):
     """Update a listing in Firebase"""
