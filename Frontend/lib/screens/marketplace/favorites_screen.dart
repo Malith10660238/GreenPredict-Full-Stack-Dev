@@ -96,21 +96,26 @@ class FavoritesScreen extends StatelessWidget {
             );
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: favs.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, i) {
-              final item = favs[i];
-              return GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProductDetailScreen(listing: item, onChatTap: () {}),
-                    ),
-                  );
-                },
+          return RefreshIndicator(
+            onRefresh: () async {
+              await provider.loadListings();
+            },
+            color: AppTheme.primaryGreen,
+            child: ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: favs.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, i) {
+                final item = favs[i];
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProductDetailScreen(listing: item, onChatTap: () {}),
+                      ),
+                    );
+                  },
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -145,6 +150,7 @@ class FavoritesScreen extends StatelessWidget {
                 ),
               );
             },
+            ),
           );
         },
       ),

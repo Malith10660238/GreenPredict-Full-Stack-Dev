@@ -5,7 +5,6 @@ import '../../services/api_service.dart';
 import '../../models/inquiry.dart';
 import '../../utils/app_theme.dart';
 import 'inquiry_chat_screen.dart';
-import 'hidden_chats_screen.dart';
 
 class ConsumerMessagesScreen extends StatefulWidget {
   const ConsumerMessagesScreen({super.key});
@@ -100,24 +99,6 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
             child: IconButton(
               icon: const Icon(Icons.search, color: Colors.white),
               onPressed: () => _showSearchDialog(),
-            ),
-          ),
-          // Hidden messages button
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.visibility_off, color: Colors.white),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const HiddenChatsScreen(isFarmer: false),
-                  ),
-                );
-              },
             ),
           ),
         ],
@@ -317,9 +298,9 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                         ),
                       ),
                     const SizedBox(width: 8),
-                    // Delete button for consumers only
+                    // Delete conversation button for consumers only
                     GestureDetector(
-                      onTap: () => _hideConversation(message),
+                      onTap: () => _deleteConversation(message),
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
@@ -365,61 +346,6 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
     );
   }
 
-  Future<void> _hideConversation(Inquiry inquiry) async {
-    try {
-      // Show confirmation dialog
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Delete Conversation'),
-          content: const Text('Are you sure you want to delete this entire conversation? This action cannot be undone and the farmer will no longer be able to access it.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Delete'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed == true) {
-        // Remove from local list immediately
-        setState(() {
-          _messages.removeWhere((m) => m.id == inquiry.id);
-        });
-
-        // Call API to delete inquiry from Firebase
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        if (authProvider.authToken != null) {
-          await _apiService.deleteInquiry(
-            inquiryId: inquiry.id,
-            token: authProvider.authToken!,
-          );
-        }
-
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Conversation deleted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      print('❌ Error deleting conversation: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to delete conversation: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
 
   void _showSearchDialog() {
     showDialog(
@@ -473,22 +399,6 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.visibility_off, color: Colors.orange),
-              title: const Text('Hide Chat', style: TextStyle(color: Colors.orange)),
-              onTap: () {
-                Navigator.pop(context);
-                _showHideMessageDialog(message);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.block, color: Colors.red),
-              title: const Text('Block Farmer', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                _showBlockFarmerDialog(message);
-              },
-            ),
-            ListTile(
               leading: const Icon(Icons.info_outline),
               title: const Text('View Details'),
               onTap: () {
@@ -502,101 +412,6 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
     );
   }
 
-  void _showHideMessageDialog(Inquiry message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hide Chat'),
-        content: Text(
-          'Are you sure you want to hide this chat with ${message.farmerName ?? 'this farmer'}? You can unhide it later from your settings.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _hideMessage(message);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Hide Chat'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _hideMessage(Inquiry message) async {
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      if (authProvider.authToken == null) {
-        throw Exception('No authentication token available');
-      }
-
-      await _apiService.hideChat(
-        inquiryId: message.id,
-        token: authProvider.authToken!,
-      );
-      
-      setState(() {
-        _messages.removeWhere((m) => m.id == message.id);
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Chat hidden successfully'),
-          backgroundColor: AppTheme.primaryGreen,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to hide chat: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  void _showBlockFarmerDialog(Inquiry message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Block Farmer'),
-        content: Text(
-          'Are you sure you want to block ${message.farmerName ?? 'this farmer'}? You won\'t be able to send messages to them.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Implement blocking functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Farmer blocked (Feature coming soon)'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Block'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showMessageDetails(Inquiry message) {
     showDialog(
@@ -643,5 +458,61 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _deleteConversation(Inquiry inquiry) async {
+    try {
+      // Show confirmation dialog
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete Conversation'),
+          content: const Text('Are you sure you want to delete this entire conversation? This action cannot be undone and the farmer will no longer be able to access it.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        // Remove from local list immediately
+        setState(() {
+          _messages.removeWhere((m) => m.id == inquiry.id);
+        });
+
+        // Call API to delete inquiry from Firebase
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        if (authProvider.authToken != null) {
+          await _apiService.deleteInquiry(
+            inquiryId: inquiry.id,
+            token: authProvider.authToken!,
+          );
+        }
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conversation deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error deleting conversation: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to delete conversation: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }

@@ -5,7 +5,6 @@ import '../../services/api_service.dart';
 import '../../models/inquiry.dart';
 import '../../utils/app_theme.dart';
 import 'inquiry_chat_screen.dart';
-import 'hidden_chats_screen.dart';
 
 class FarmerInquiriesScreen extends StatefulWidget {
   const FarmerInquiriesScreen({super.key});
@@ -100,24 +99,6 @@ class _FarmerInquiriesScreenState extends State<FarmerInquiriesScreen> {
             child: IconButton(
               icon: const Icon(Icons.search, color: Colors.white),
               onPressed: () => _showSearchDialog(),
-            ),
-          ),
-          // Hidden messages button
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.visibility_off, color: Colors.white),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const HiddenChatsScreen(isFarmer: true),
-                  ),
-                );
-              },
             ),
           ),
         ],
@@ -396,22 +377,6 @@ class _FarmerInquiriesScreenState extends State<FarmerInquiriesScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.visibility_off, color: Colors.orange),
-              title: const Text('Hide Chat', style: TextStyle(color: Colors.orange)),
-              onTap: () {
-                Navigator.pop(context);
-                _showHideInquiryDialog(inquiry);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.block, color: Colors.red),
-              title: const Text('Block User', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                _showBlockUserDialog(inquiry);
-              },
-            ),
-            ListTile(
               leading: const Icon(Icons.info_outline),
               title: const Text('View Details'),
               onTap: () {
@@ -425,101 +390,6 @@ class _FarmerInquiriesScreenState extends State<FarmerInquiriesScreen> {
     );
   }
 
-  void _showHideInquiryDialog(Inquiry inquiry) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hide Chat'),
-        content: Text(
-          'Are you sure you want to hide this chat with ${inquiry.consumerName ?? 'this customer'}? You can unhide it later from your settings.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _hideInquiry(inquiry);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Hide Chat'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _hideInquiry(Inquiry inquiry) async {
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      if (authProvider.authToken == null) {
-        throw Exception('No authentication token available');
-      }
-
-      await _apiService.hideChat(
-        inquiryId: inquiry.id,
-        token: authProvider.authToken!,
-      );
-      
-      setState(() {
-        _inquiries.removeWhere((i) => i.id == inquiry.id);
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Chat hidden successfully'),
-          backgroundColor: AppTheme.primaryGreen,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to hide chat: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  void _showBlockUserDialog(Inquiry inquiry) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Block User'),
-        content: Text(
-          'Are you sure you want to block ${inquiry.consumerName ?? 'this customer'}? You won\'t be able to receive messages from them.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Implement blocking functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('User blocked (Feature coming soon)'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Block'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showInquiryDetails(Inquiry inquiry) {
     showDialog(

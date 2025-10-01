@@ -70,13 +70,19 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         builder: (context, authProvider, child) {
           return Consumer<ListingProvider>(
             builder: (context, listingProvider, child) {
-              return CustomScrollView(
-                slivers: [
-                  _buildProfessionalAppBar(authProvider),
-                  SliverToBoxAdapter(child: _buildSearchAndControls()),
-                  SliverToBoxAdapter(child: _buildFilterChips()),
-                  _buildProductsGrid(authProvider, listingProvider),
-                ],
+              return RefreshIndicator(
+                onRefresh: () async {
+                  await Provider.of<ListingProvider>(context, listen: false).loadListings();
+                },
+                color: AppTheme.primaryGreen,
+                child: CustomScrollView(
+                  slivers: [
+                    _buildProfessionalAppBar(authProvider),
+                    SliverToBoxAdapter(child: _buildSearchAndControls()),
+                    SliverToBoxAdapter(child: _buildFilterChips()),
+                    _buildProductsGrid(authProvider, listingProvider),
+                  ],
+                ),
               );
             },
           );

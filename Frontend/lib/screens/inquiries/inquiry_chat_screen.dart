@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -39,16 +40,21 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
   String? _error;
   bool _showEmojiPicker = false;
   final ImagePicker _imagePicker = ImagePicker();
+  
+  // Auto-refresh functionality
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _messages = List.from(widget.inquiry.messages);
     _loadInquiryDetails();
+    _startAutoRefresh();
   }
 
   @override
   void dispose() {
+    _stopAutoRefresh();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -94,6 +100,65 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  // Auto-refresh methods
+  void _startAutoRefresh() {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (mounted) {
+        _autoRefreshMessages();
+      }
+    });
+  }
+
+  void _stopAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+  }
+
+  Future<void> _autoRefreshMessages() async {
+    // Prevent overlapping refreshes
+    if (_isSending || _isLoading || !mounted) return;
+    
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.authToken == null) return;
+
+      final data = await _apiService.getInquiryDetails(widget.inquiry.id, authProvider.authToken!);
+      final updatedInquiry = Inquiry.fromJson(data);
+      
+      // Only update if there are new messages and we're still mounted
+      if (mounted && updatedInquiry.messages.length != _messages.length) {
+        // Store the previous message count
+        final previousMessageCount = _messages.length;
+        
+        setState(() {
+          _messages = updatedInquiry.messages;
+        });
+        
+        // Merge backend messages with local image data
+        await _mergeBackendMessagesWithLocalImages();
+        
+        // Update the parent widget
+        widget.onInquiryUpdated(updatedInquiry);
+        
+        // Only scroll if new messages were actually added
+        if (mounted && _messages.length > previousMessageCount) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients && mounted) {
+              _scrollController.animateTo(
+                _scrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+            }
+          });
+        }
+      }
+      
+    } catch (e) {
+      // Silent error handling - no visual feedback needed
     }
   }
 
@@ -355,56 +420,69 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
                 ],
               ),
             ),
-            child: Stack(
-              children: [
-                // Pattern background
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: ChatPatternPainter(),
+            child: RefreshIndicator(
+              onRefresh: _loadInquiryDetails,
+              color: AppTheme.primaryGreen,
+              backgroundColor: Colors.white,
+              strokeWidth: 2.0,
+              child: Stack(
+                children: [
+                  // Pattern background
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: ChatPatternPainter(),
+                    ),
                   ),
-                ),
-                // Messages content
-                _messages.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                  // Messages content
+                  _messages.isEmpty
+                      ? ListView(
                           children: [
-                            Icon(
-                              Icons.chat_bubble_outline,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No messages yet',
-                              style: AppTheme.bodyLarge.copyWith(
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w600,
+                            SizedBox(
+                              height: MediaQuery.of(context).size.height * 0.6,
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.chat_bubble_outline,
+                                      size: 64,
+                                      color: Colors.grey[400],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No messages yet',
+                                      style: AppTheme.bodyLarge.copyWith(
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      widget.isFarmer
+                                          ? 'Reply to this inquiry to start the conversation.'
+                                          : 'The farmer will reply to your inquiry soon.',
+                                      style: AppTheme.bodyMedium.copyWith(
+                                        color: Colors.grey[500],
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              widget.isFarmer
-                                  ? 'Reply to this inquiry to start the conversation.'
-                                  : 'The farmer will reply to your inquiry soon.',
-                              style: AppTheme.bodyMedium.copyWith(
-                                color: Colors.grey[500],
-                              ),
-                              textAlign: TextAlign.center,
                             ),
                           ],
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: _messages.length,
+                          itemBuilder: (context, index) {
+                            final message = _messages[index];
+                            return _buildMessageBubble(message);
+                          },
                         ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) {
-                          final message = _messages[index];
-                          return _buildMessageBubble(message);
-                        },
-                      ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -898,23 +976,6 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
                                 : Colors.grey[500],
                           ),
                         ),
-                        // Delete button for consumers only
-                        if (isFromCurrentUser && !widget.isFarmer)
-                          GestureDetector(
-                            onTap: () => _deleteMessage(message),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Icon(
-                                Icons.delete_outline,
-                                size: 16,
-                                color: Colors.red[600],
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                   ],
@@ -944,62 +1005,6 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
     }
   }
 
-  Future<void> _deleteMessage(InquiryMessage message) async {
-    try {
-      // Show confirmation dialog
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Delete Message'),
-          content: const Text('Are you sure you want to delete this message?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Delete'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed == true) {
-        // Remove message from local list
-        setState(() {
-          _messages.removeWhere((m) => m.id == message.id);
-        });
-
-        // Call API to delete message
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        if (authProvider.authToken != null) {
-          await _apiService.deleteMessage(
-            inquiryId: message.inquiryId,
-            messageId: message.id,
-            token: authProvider.authToken!,
-          );
-        }
-
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Message deleted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      print('❌ Error deleting message: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to delete message: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
 
 
   Widget _buildMessageInput() {
@@ -1106,14 +1111,6 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete Message', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                _showDeleteMessageDialog(message);
-              },
-            ),
-            ListTile(
               leading: const Icon(Icons.copy),
               title: const Text('Copy Message'),
               onTap: () {
@@ -1127,32 +1124,6 @@ class _InquiryChatScreenState extends State<InquiryChatScreen> {
     );
   }
 
-  void _showDeleteMessageDialog(InquiryMessage message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Message'),
-        content: const Text('Are you sure you want to delete this message? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteMessage(message);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
 
 
   void _copyMessage(String message) {
