@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import '../../providers/listing_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -24,6 +25,16 @@ class FavoritesScreen extends StatelessWidget {
     
     final firstImagePath = images.first.toString();
     
+    // Check for empty or invalid strings
+    if (firstImagePath.isEmpty || firstImagePath.trim().isEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          color: AppTheme.lightGray,
+        ),
+        child: const Icon(Icons.eco, color: AppTheme.primaryGreen),
+      );
+    }
+    
     // Check if it's a local file path or network URL
     if (firstImagePath.startsWith('/') || firstImagePath.startsWith('file://')) {
       // Local file - use Image.file
@@ -42,13 +53,13 @@ class FavoritesScreen extends StatelessWidget {
         },
       );
     } else {
-      // Network URL - use Image.network
-      return Image.network(
-        firstImagePath,
+      // Network URL - use CachedNetworkImage
+      return CachedNetworkImage(
+        imageUrl: firstImagePath,
         width: 56,
         height: 56,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
+        errorWidget: (context, url, error) {
           return Container(
             decoration: BoxDecoration(
               color: AppTheme.lightGray,

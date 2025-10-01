@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import '../../providers/listing_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -903,6 +904,12 @@ class _EditListingScreenState extends State<EditListingScreen> {
   Widget _buildNetworkImageWithFallback(String imagePath, double width, double height) {
     print('🔍 Loading image: $imagePath');
     
+    // Check for empty or invalid strings
+    if (imagePath.isEmpty || imagePath.trim().isEmpty) {
+      print('❌ Empty image path detected');
+      return _buildErrorPlaceholder(width, height);
+    }
+    
     // Check if it's a local file path or network URL
     if (imagePath.startsWith('/') || imagePath.startsWith('file://')) {
       // Local file - use Image.file
@@ -916,35 +923,36 @@ class _EditListingScreenState extends State<EditListingScreen> {
           return _buildErrorPlaceholder(width, height);
         },
       );
-    } else {
-      // Network URL - use Image.network
-      return Image.network(
-        imagePath,
+    } else if (imagePath.startsWith('http')) {
+      // Network URL (including Cloudinary) - use CachedNetworkImage for better performance
+      return CachedNetworkImage(
+        imageUrl: imagePath,
         width: width,
         height: height,
         fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Container(
-            width: width,
-            height: height,
-            decoration: BoxDecoration(
-              color: AppTheme.lightGray,
-              borderRadius: BorderRadius.circular(10),
+        placeholder: (context, url) => Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: AppTheme.lightGray,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
             ),
-            child: const Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
-              ),
-            ),
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          print('❌ Network image load error for $imagePath: $error');
+          ),
+        ),
+        errorWidget: (context, url, error) {
+          print('❌ CachedNetworkImage load error for $imagePath: $error');
           return _buildErrorPlaceholder(width, height);
         },
       );
+    } else {
+      // Unknown format - show placeholder
+      print('❌ Unknown image format: $imagePath');
+      return _buildErrorPlaceholder(width, height);
     }
   }
 

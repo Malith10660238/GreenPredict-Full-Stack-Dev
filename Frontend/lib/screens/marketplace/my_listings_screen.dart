@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import '../../utils/app_theme.dart';
 import '../../providers/listing_provider.dart';
@@ -99,6 +100,16 @@ class _ListingCardState extends State<_ListingCard> {
     
     final firstImagePath = images.first.toString();
     
+    // Check for empty or invalid strings
+    if (firstImagePath.isEmpty || firstImagePath.trim().isEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: AppTheme.primaryGradient,
+        ),
+        child: const Icon(Icons.eco_rounded, color: Colors.white),
+      );
+    }
+    
     // Check if it's a local file path or network URL
     if (firstImagePath.startsWith('/') || firstImagePath.startsWith('file://')) {
       // Local file - use Image.file
@@ -117,13 +128,13 @@ class _ListingCardState extends State<_ListingCard> {
         },
       );
     } else {
-      // Network URL - use Image.network
-      return Image.network(
-        firstImagePath,
+      // Network URL - use CachedNetworkImage
+      return CachedNetworkImage(
+        imageUrl: firstImagePath,
         width: 64,
         height: 64,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
+        errorWidget: (context, url, error) {
           return Container(
             decoration: BoxDecoration(
               gradient: AppTheme.primaryGradient,

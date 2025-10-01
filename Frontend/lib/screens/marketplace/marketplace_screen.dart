@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/listing_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/app_theme.dart';
@@ -701,31 +702,37 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   Widget _buildProductImage(dynamic imageData) {
     if (imageData is String) {
+      // Check for empty or invalid strings
+      if (imageData.isEmpty || imageData.trim().isEmpty) {
+        return const Center(
+          child: Icon(
+            Icons.image,
+            size: 40,
+            color: AppTheme.darkGray,
+          ),
+        );
+      }
+      
       if (imageData.startsWith('http')) {
-        // Network image
-        return Image.network(
-          imageData,
+        // Network image (including Cloudinary) - use CachedNetworkImage
+        return CachedNetworkImage(
+          imageUrl: imageData,
           width: double.infinity,
           height: double.infinity,
           fit: BoxFit.cover,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return const Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
-              ),
-            );
-          },
-          errorBuilder: (context, error, stackTrace) {
-            return const Center(
-              child: Icon(
-                Icons.image,
-                size: 40,
-                color: AppTheme.darkGray,
-              ),
-            );
-          },
+          placeholder: (context, url) => const Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+            ),
+          ),
+          errorWidget: (context, url, error) => const Center(
+            child: Icon(
+              Icons.image,
+              size: 40,
+              color: AppTheme.darkGray,
+            ),
+          ),
         );
       } else {
         // Local file path

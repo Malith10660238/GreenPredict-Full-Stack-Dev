@@ -1382,7 +1382,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     child: Stack(
                                       children: [
                                         // Background image
-                                        imageUrl.startsWith('http') 
+                                        (imageUrl.isNotEmpty && imageUrl.startsWith('http')) 
                                           ? Image.network(
                                               imageUrl,
                                               width: double.infinity,
@@ -1421,27 +1421,41 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                                 );
                                               },
                                             )
-                                          : Image.asset(
-                                              imageUrl,
-                                              width: double.infinity,
-                                              height: double.infinity,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) {
-                                                return Container(
-                                                  decoration: BoxDecoration(
-                                                    gradient: gradient,
-                                                    borderRadius: BorderRadius.circular(16),
-                                                  ),
-                                                  child: Center(
-                                                    child: Icon(
-                                                      icon,
-                                                      color: Colors.white,
-                                                      size: 48,
+                                          : (imageUrl.isNotEmpty && !imageUrl.startsWith('http'))
+                                            ? Image.asset(
+                                                imageUrl,
+                                                width: double.infinity,
+                                                height: double.infinity,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  return Container(
+                                                    decoration: BoxDecoration(
+                                                      gradient: gradient,
+                                                      borderRadius: BorderRadius.circular(16),
                                                     ),
+                                                    child: Center(
+                                                      child: Icon(
+                                                        icon,
+                                                        color: Colors.white,
+                                                        size: 48,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              )
+                                            : Container(
+                                                decoration: BoxDecoration(
+                                                  gradient: gradient,
+                                                  borderRadius: BorderRadius.circular(16),
+                                                ),
+                                                child: Center(
+                                                  child: Icon(
+                                                    icon,
+                                                    color: Colors.white,
+                                                    size: 48,
                                                   ),
-                                                );
-                                              },
-                                            ),
+                                                ),
+                                              ),
                                         // Gradient overlay
                                         Container(
                                           decoration: BoxDecoration(

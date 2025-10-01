@@ -1026,8 +1026,11 @@ async def upload_profile_image(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
-    """Upload profile image to Firebase Storage"""
+    """Upload profile image to Cloudinary"""
     try:
+        # Import Cloudinary service
+        from cloudinary_service import cloudinary_service
+        
         # Validate file type - be more flexible with content type detection
         print(f"🔵 File content type: {file.content_type}")
         print(f"🔵 File filename: {file.filename}")
@@ -1055,40 +1058,25 @@ async def upload_profile_image(
         file_data = await file.read()
         print(f"🔵 File data size: {len(file_data)} bytes")
         
-        # Generate unique filename - be more flexible with extension detection
-        file_extension = "jpg"  # Default to jpg
-        if file.content_type:
-            if "jpeg" in file.content_type or "jpg" in file.content_type:
-                file_extension = "jpg"
-            elif "png" in file.content_type:
-                file_extension = "png"
-            elif "gif" in file.content_type:
-                file_extension = "gif"
-        elif file.filename:
-            # Determine extension from filename
-            if file.filename.lower().endswith('.png'):
-                file_extension = "png"
-            elif file.filename.lower().endswith('.gif'):
-                file_extension = "gif"
+        # Upload to Cloudinary
+        uid = current_user['uid']
+        print(f"🔵 Uploading to Cloudinary for user: {uid}")
         
-        filename = f"profile_images/{current_user['uid']}/{uuid.uuid4()}.{file_extension}"
-        print(f"🔵 Generated filename: {filename}")
+        image_url = await cloudinary_service.upload_profile_image(
+            user_id=uid,
+            image_data=file_data,
+            content_type=file.content_type or "image/jpeg"
+        )
         
-        # Save to local storage (like listing images)
-        import os
-        upload_dir = "uploads/profile_images"
-        os.makedirs(upload_dir, exist_ok=True)
+        if not image_url:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to upload image to Cloudinary"
+            )
         
-        # Save file locally
-        local_file_path = os.path.join(upload_dir, f"{current_user['uid']}_{uuid.uuid4()}.{file_extension}")
-        with open(local_file_path, "wb") as f:
-            f.write(file_data)
-        
-        # Create URL for local file
-        image_url = f"http://10.0.2.2:8001/{local_file_path.replace(os.sep, '/')}"
+        print(f"✅ Image uploaded to Cloudinary: {image_url}")
         
         # Update user document with image URL
-        uid = current_user['uid']
         print(f"🔵 Updating profile image for user: {uid}")
         print(f"🔵 Image URL: {image_url}")
         user_ref = db.collection('users').document(uid)
@@ -1116,7 +1104,7 @@ async def upload_profile_image(
             print(f"✅ Updated consumers collection with profileImageUrl")
         
         return {
-            "message": "Profile image uploaded successfully",
+            "message": "Profile image uploaded successfully to Cloudinary",
             "image_url": image_url
         }
         
@@ -1126,6 +1114,73 @@ async def upload_profile_image(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload profile image: {str(e)}"
+        )
+
+@app.post("/listings/upload-images", tags=["Marketplace"])
+async def upload_listing_images(
+    files: List[UploadFile] = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload listing images to Cloudinary"""
+    try:
+        # Import Cloudinary service
+        from cloudinary_service import cloudinary_service
+        
+        # Validate user is a farmer
+        if current_user.get('userType') != 'farmer':
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only farmers can upload listing images"
+            )
+        
+        # Validate number of files
+        if len(files) > 5:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Maximum 5 images allowed"
+            )
+        
+        uploaded_urls = []
+        
+        for i, file in enumerate(files):
+            # Validate file type
+            if not file.content_type or not file.content_type.startswith('image/'):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"File {i+1} must be an image"
+                )
+            
+            # Read file data
+            file_data = await file.read()
+            print(f"🔵 Uploading listing image {i+1}: {len(file_data)} bytes")
+            
+            # Upload to Cloudinary
+            image_url = await cloudinary_service.upload_listing_image(
+                listing_id=f"temp_{uuid.uuid4()}",  # Temporary ID, will be updated when listing is created
+                image_data=file_data,
+                content_type=file.content_type
+            )
+            
+            if not image_url:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to upload image {i+1} to Cloudinary"
+                )
+            
+            uploaded_urls.append(image_url)
+            print(f"✅ Image {i+1} uploaded to Cloudinary: {image_url}")
+        
+        return {
+            "message": f"Successfully uploaded {len(uploaded_urls)} images to Cloudinary",
+            "image_urls": uploaded_urls
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload listing images: {str(e)}"
         )
 
 @app.delete("/profile/image", tags=["User Profiles"])

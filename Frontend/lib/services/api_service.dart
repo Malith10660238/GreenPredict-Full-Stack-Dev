@@ -5,7 +5,7 @@ import 'package:http_parser/http_parser.dart';
 
 class ApiService {
   // FastAPI backend URL
-  static const String baseUrl = 'http://10.0.2.2:8001'; // FastAPI backend (Android emulator)
+  static const String baseUrl = 'http://192.168.1.157:8001'; // FastAPI backend (Real device)
   
   // API Endpoints
   static const String _authEndpoint = '/auth';
@@ -185,6 +185,49 @@ class ApiService {
         throw Exception('Failed to create listing: ${response.reasonPhrase}');
       }
     } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
+  // Upload listing images to Cloudinary
+  Future<List<String>> uploadListingImages(
+    List<File> imageFiles,
+    String token,
+  ) async {
+    try {
+      print('🔵 Uploading ${imageFiles.length} images to Cloudinary');
+      
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/listings/upload-images'),
+      );
+      
+      request.headers.addAll(_authHeaders(token));
+      
+      // Add all image files
+      for (int i = 0; i < imageFiles.length; i++) {
+        var multipartFile = await http.MultipartFile.fromPath(
+          'files',
+          imageFiles[i].path,
+          contentType: MediaType('image', 'jpeg'),
+        );
+        request.files.add(multipartFile);
+      }
+      
+      var response = await request.send();
+      var responseBody = await response.stream.bytesToString();
+      
+      if (response.statusCode == 200) {
+        final result = jsonDecode(responseBody);
+        final List<String> imageUrls = List<String>.from(result['image_urls']);
+        print('✅ Images uploaded to Cloudinary: $imageUrls');
+        return imageUrls;
+      } else {
+        print('❌ Image upload failed - Status: ${response.statusCode}, Body: $responseBody');
+        throw Exception('Failed to upload images: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('❌ Network error during image upload: $e');
       throw Exception('Network error: $e');
     }
   }

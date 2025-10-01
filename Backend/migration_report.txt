@@ -1,0 +1,35 @@
+Cloudinary Migration Report
+==================================================
+
+Profile Images Migrated: 7
+  - User: 2qBsMZEOQ0MY1EFfxTz4dgl3s9i1
+    Local: uploads\profile_images\2qBsMZEOQ0MY1EFfxTz4dgl3s9i1_03517cba-69af-4cfa-8a9f-6a372759fbdc.jpg
+    Cloudinary: https://res.cloudinary.com/djvlvrsu3/image/upload/v1759301878/greenpredict/profile_images/profile_2qBsMZEOQ0MY1EFfxTz4dgl3s9i1.jpg
+
+  - User: 2qBsMZEOQ0MY1EFfxTz4dgl3s9i1
+    Local: uploads\profile_images\2qBsMZEOQ0MY1EFfxTz4dgl3s9i1_5e1bc311-28f2-4181-995e-d7d1634c19ff.jpg
+    Cloudinary: https://res.cloudinary.com/djvlvrsu3/image/upload/v1759301879/greenpredict/profile_images/profile_2qBsMZEOQ0MY1EFfxTz4dgl3s9i1.jpg
+
+  - User: 2qBsMZEOQ0MY1EFfxTz4dgl3s9i1
+    Local: uploads\profile_images\2qBsMZEOQ0MY1EFfxTz4dgl3s9i1_7dacb0b0-a5a1-4a04-a7f2-b1a8f2c191e4.jpg
+    Cloudinary: https://res.cloudinary.com/djvlvrsu3/image/upload/v1759301880/greenpredict/profile_images/profile_2qBsMZEOQ0MY1EFfxTz4dgl3s9i1.jpg
+
+  - User: 2qBsMZEOQ0MY1EFfxTz4dgl3s9i1
+    Local: uploads\profile_images\2qBsMZEOQ0MY1EFfxTz4dgl3s9i1_8e72c43e-ee79-4934-8092-2d06b0608792.jpg
+    Cloudinary: https://res.cloudinary.com/djvlvrsu3/image/upload/v1759301881/greenpredict/profile_images/profile_2qBsMZEOQ0MY1EFfxTz4dgl3s9i1.jpg
+
+  - User: acf13df1-093a-49f9-a92f-44f53836932f
+    Local: uploads\profile_images\acf13df1-093a-49f9-a92f-44f53836932f.jpg
+    Cloudinary: https://res.cloudinary.com/djvlvrsu3/image/upload/v1759301882/greenpredict/profile_images/profile_acf13df1-093a-49f9-a92f-44f53836932f.png
+
+  - User: ng82isXAqgTelbZgq1aqU1MHGR12
+    Local: uploads\profile_images\ng82isXAqgTelbZgq1aqU1MHGR12_cef99b99-b7c9-487b-8fe9-9bb234d5ffb3.jpg
+    Cloudinary: https://res.cloudinary.com/djvlvrsu3/image/upload/v1759301883/greenpredict/profile_images/profile_ng82isXAqgTelbZgq1aqU1MHGR12.jpg
+
+  - User: xlbtn5yaNXXOm7quq5Xvv61JFY22
+    Local: uploads\profile_images\xlbtn5yaNXXOm7quq5Xvv61JFY22_eb1686de-8221-4ae6-8dd8-d8223d0a4472.jpg
+    Cloudinary: https://res.cloudinary.com/djvlvrsu3/image/upload/v1759301884/greenpredict/profile_images/profile_xlbtn5yaNXXOm7quq5Xvv61JFY22.jpg
+
+Listing Images Migrated: 0
+Migration completed successfully!
+You can now safely delete the local images.

@@ -401,10 +401,10 @@ Widget _buildSliverAppBar(AuthProvider authProvider) {
                                 radius: 60,
                                 backgroundImage: profileImage != null 
                                     ? FileImage(profileImage) 
-                                    : (profileImageUrl != null 
+                                    : (profileImageUrl != null && profileImageUrl.isNotEmpty
                                         ? NetworkImage(profileImageUrl) as ImageProvider
                                         : null),
-                                child: (profileImage == null && profileImageUrl == null)
+                                child: (profileImage == null && (profileImageUrl == null || profileImageUrl.isEmpty))
                                     ? Icon(
                                         isFarmer ? Icons.agriculture : Icons.shopping_bag,
                                         size: 50, 

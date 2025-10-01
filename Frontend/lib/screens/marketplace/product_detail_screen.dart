@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/listing_provider.dart';
 import '../../utils/app_theme.dart';
@@ -877,23 +878,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     
     // Check if we have a valid network URL
     if (imageUrl.startsWith('http')) {
-      print('🔵 Using network image: $imageUrl');
+      print('🔵 Using CachedNetworkImage for: $imageUrl');
       return ClipRRect(
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(12),
           topRight: Radius.circular(12),
         ),
-        child: Image.network(
-          imageUrl,
+        child: CachedNetworkImage(
+          imageUrl: imageUrl,
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return _buildPlaceholderImage();
-          },
-          errorBuilder: (context, error, stackTrace) {
-            print('🔵 Network image failed to load: $error');
+          placeholder: (context, url) => _buildPlaceholderImage(),
+          errorWidget: (context, url, error) {
+            print('🔵 CachedNetworkImage failed to load: $error');
             return _buildPlaceholderImage();
           },
         ),

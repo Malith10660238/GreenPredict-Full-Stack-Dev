@@ -132,17 +132,23 @@ class ListingProvider with ChangeNotifier {
       _setLoading(true);
       _setError(null);
       
-      // Convert File objects to paths for storage
-      List<String> imagePaths = _selectedImages.map((file) => file.path).toList();
+      final apiService = ApiService();
+      List<String> imageUrls = [];
       
-      // Prepare listing data for backend
+      // Upload images to Cloudinary first
+      if (_selectedImages.isNotEmpty) {
+        print('🔵 Uploading ${_selectedImages.length} images to Cloudinary...');
+        imageUrls = await apiService.uploadListingImages(_selectedImages, token);
+        print('✅ Images uploaded successfully: $imageUrls');
+      }
+      
+      // Prepare listing data for backend with Cloudinary URLs
       final listingPayload = {
         ...listingData,
-        'images': imagePaths,
+        'images': imageUrls, // Use Cloudinary URLs instead of local paths
       };
       
       // Call the real backend API
-      final apiService = ApiService();
       final newListing = await apiService.createListing(listingPayload, token);
       
       _listings.insert(0, newListing);
@@ -152,6 +158,7 @@ class ListingProvider with ChangeNotifier {
     } catch (e) {
       _setLoading(false);
       _setError('Failed to add listing. Please try again.');
+      print('❌ Error adding listing: $e');
     }
   }
   
@@ -160,20 +167,38 @@ class ListingProvider with ChangeNotifier {
       _setLoading(true);
       _setError(null);
       
-      // Handle images: use the images from listingData if provided, otherwise use selectedImages
+      final apiService = ApiService();
+      
+      // Handle images: upload new images to Cloudinary if any
       if (listingData.containsKey('images')) {
-        // Images are already processed in the calling code (edit screen)
-        print('🔵 Using pre-processed images from listingData: ${listingData['images']}');
-      } else if (_selectedImages.isNotEmpty) {
-        // Convert File objects to paths for storage (for create listing)
-        List<String> imagePaths = _selectedImages.map((file) => file.path).toList();
-        listingData['images'] = imagePaths;
-        print('🔵 Updating listing with selected images: $imagePaths');
-      } else {
-        print('🔵 No images to update, preserving existing images');
+        List<String> allImages = List<String>.from(listingData['images']);
+        List<String> cloudinaryImages = [];
+        List<File> newImagesToUpload = [];
+        
+        // Separate existing Cloudinary URLs from new local files
+        for (String imagePath in allImages) {
+          if (imagePath.startsWith('http') && imagePath.contains('cloudinary.com')) {
+            // Keep existing Cloudinary URLs
+            cloudinaryImages.add(imagePath);
+          } else if (imagePath.startsWith('/') || imagePath.startsWith('file://')) {
+            // New local files - upload to Cloudinary
+            newImagesToUpload.add(File(imagePath));
+          }
+        }
+        
+        // Upload new images to Cloudinary
+        if (newImagesToUpload.isNotEmpty) {
+          print('🔵 Uploading ${newImagesToUpload.length} new images to Cloudinary...');
+          List<String> newCloudinaryUrls = await apiService.uploadListingImages(newImagesToUpload, token);
+          cloudinaryImages.addAll(newCloudinaryUrls);
+          print('✅ New images uploaded to Cloudinary: $newCloudinaryUrls');
+        }
+        
+        // Update the listing data with Cloudinary URLs
+        listingData['images'] = cloudinaryImages;
+        print('🔵 Final images for update: $cloudinaryImages');
       }
       
-      final apiService = ApiService();
       final updatedListing = await apiService.updateListing(listingId, listingData, token);
       
       // Update the listing in the local list
@@ -189,6 +214,7 @@ class ListingProvider with ChangeNotifier {
     } catch (e) {
       _setLoading(false);
       _setError('Failed to update listing. Please try again.');
+      print('❌ Error updating listing: $e');
     }
   }
   
