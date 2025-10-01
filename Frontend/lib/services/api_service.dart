@@ -5,7 +5,7 @@ import 'package:http_parser/http_parser.dart';
 
 class ApiService {
   // FastAPI backend URL
-  static const String baseUrl = 'http://192.168.1.157:8001'; // FastAPI backend (Real device)
+  static const String baseUrl = 'https://receiving-preparation-presentations-trail.trycloudflare.com'; // Cloudflare Tunnel
   
   // API Endpoints
   static const String _authEndpoint = '/auth';

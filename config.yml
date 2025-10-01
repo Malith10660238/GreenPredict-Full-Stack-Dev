@@ -1,0 +1,7 @@
+tunnel: greenpredict-backend
+credentials-file: C:\Users\%USERNAME%\.cloudflared\greenpredict-backend.json
+
+ingress:
+  - hostname: greenpredict-backend.trycloudflare.com
+    service: http://localhost:8001
+  - service: http_status:404
