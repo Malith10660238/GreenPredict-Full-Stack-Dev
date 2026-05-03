@@ -99,3 +99,6 @@ Software Engineering Undergraduate
 
 ## 📌 Note
 This project was developed as a final year academic project demonstrating full-stack development, AI integration, and real-world problem solving.
+
+![Login](assets/screenshots/login.png)
+
